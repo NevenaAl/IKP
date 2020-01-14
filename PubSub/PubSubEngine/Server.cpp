@@ -9,9 +9,79 @@
 
 bool InitializeWindowsSockets();
 void SelectFunc(int, SOCKET, char);
+void Subscribe(struct Queue*, char*, char*);
+void ExpandQueue(struct Queue*);
+
+struct topic_sub {
+	char* topic;
+	char** subs_array;
+	int size;
+};
+struct Queue
+{
+	int front, rear, size;
+	unsigned capacity;
+	topic_sub* array;
+};
+
+// function to create a queue of given capacity.  
+// It initializes size of queue as 0 
+struct Queue* createQueue(unsigned capacity)
+{
+	struct Queue* queue = (struct Queue*) malloc(sizeof(struct Queue));
+	queue->capacity = capacity;
+	queue->front = queue->size = 0;
+	queue->rear = capacity - 1;  // This is important, see the enqueue 
+	queue->array = (topic_sub*)malloc(queue->capacity * sizeof(topic_sub));
+	return queue;
+}
+
+// Queue is full when size becomes equal to the capacity  
+int isFull(struct Queue* queue)
+{
+	return (queue->size == queue->capacity);
+}
+
+// Queue is empty when size is 0 
+int isEmpty(struct Queue* queue)
+{
+	return (queue->size == 0);
+}
+
+// Function to add an item to the queue.   
+// It changes rear and size 
+void enqueue(struct Queue* queue, char* topic)
+{
+	topic_sub item;
+	item.topic = topic;
+	item.subs_array = (char**)malloc(300);
+	item.size = 0;
+
+	if (isFull(queue))
+	   ExpandQueue(queue);
+	queue->rear = (queue->rear + 1) % queue->capacity;
+	queue->array[queue->rear] = item;
+	queue->size = queue->size + 1;
+	printf("%s enqueued to queue\n", item.topic);
+}
+
+topic_sub dequeue(struct Queue* queue)
+{
+	//if (isEmpty(queue))
+//		return;
+	topic_sub item = queue->array[queue->front];
+	queue->front = (queue->front + 1) % queue->capacity;
+	queue->size = queue->size - 1;
+	return item;
+}
 
 int  main(void)
 {
+	struct Queue* queue = createQueue(1000);
+	
+	enqueue(queue, "Sport");
+	enqueue(queue, "Fashion");
+	
 	// Socket used for listening for new clients 
 	SOCKET listenSocket = INVALID_SOCKET;
 	// Socket used for communication with client
@@ -133,10 +203,19 @@ int  main(void)
 
 			iResult = recv(acceptedSocket, recvbuf, DEFAULT_BUFLEN, 0);
 
+			char delimiter[] = ":";
+			char *ptr = strtok(recvbuf, delimiter);
+
+			char *sub = ptr;
+			ptr = strtok(NULL, delimiter);
+			char *topic = ptr;
+			ptr = strtok(NULL, delimiter);
+
+			Subscribe(queue,sub, topic);
 
 			if (iResult > 0)
 			{
-				printf("Message received from client: %s.\n", recvbuf);
+				printf("Subscriber %s subscribed to topic: %s. \n", sub, topic);
 			}
 			else if (iResult == 0)
 			{
@@ -172,6 +251,19 @@ int  main(void)
 	WSACleanup();
 
 	return 0;
+}
+void ExpandQueue(struct Queue* queue) {
+	queue->array = (topic_sub*)realloc(queue->array,queue->size + queue->capacity);
+	queue->capacity += queue->capacity;
+}
+void Subscribe(struct Queue* queue,char* sub, char* topic) {
+	for (int i = 0; i < queue->size; i++) {
+		if (!strcmp(queue->array[i].topic,topic)) {
+			int index = queue->array[i].size;
+			queue->array[i].subs_array[index] = sub;
+			queue->array[i].size++;
+		}
+	}
 }
 
 void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
