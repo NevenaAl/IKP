@@ -6,22 +6,36 @@
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27016"
 #define SERVER_SLEEP_TIME 50
+#define NUMBER_OF_CLIENTS 20
+#define SAFE_DELETE_HANDLE(h) {if(h)CloseHandle(h);}
 
 bool InitializeWindowsSockets();
 void SelectFunc(int, SOCKET, char);
-void Subscribe(struct Queue*, char*, char*);
-void ExpandQueue(struct Queue*);
+void Subscribe(struct Queue*, SOCKET, char*);
+void Publish(struct MessageQueue*, char*, char*);
+void ExpandQueue(struct Queue*); //da li je potrebno
+void ExpandMessageQueue(struct MessageQueue*);
 
 struct topic_sub {
 	char* topic;
-	char** subs_array;
+	SOCKET* subs_array;
 	int size;
+};
+struct topic_message {
+	char* topic;
+	char* message;
 };
 struct Queue
 {
 	int front, rear, size;
 	unsigned capacity;
 	topic_sub* array;
+};
+struct MessageQueue
+{
+	int front, rear, size;
+	unsigned capacity;
+	topic_message* array;
 };
 
 // function to create a queue of given capacity.  
@@ -33,6 +47,15 @@ struct Queue* createQueue(unsigned capacity)
 	queue->front = queue->size = 0;
 	queue->rear = capacity - 1;  // This is important, see the enqueue 
 	queue->array = (topic_sub*)malloc(queue->capacity * sizeof(topic_sub));
+	return queue;
+}
+struct MessageQueue* createMessageQueue(unsigned capacity)
+{
+	struct MessageQueue* queue = (struct MessageQueue*) malloc(sizeof(struct MessageQueue));
+	queue->capacity = capacity;
+	queue->front = queue->size = 0;
+	queue->rear = capacity - 1;  // This is important, see the enqueue 
+	queue->array = (topic_message*)malloc(queue->capacity * sizeof(topic_message));
 	return queue;
 }
 
@@ -54,7 +77,7 @@ void enqueue(struct Queue* queue, char* topic)
 {
 	topic_sub item;
 	item.topic = topic;
-	item.subs_array = (char**)malloc(300);
+	item.subs_array = (SOCKET*)malloc(300);
 	item.size = 0;
 
 	if (isFull(queue))
@@ -74,18 +97,33 @@ topic_sub dequeue(struct Queue* queue)
 	queue->size = queue->size - 1;
 	return item;
 }
-
+DWORD WINAPI PublisherWork(LPVOID lpParam) 
+{
+	//u ovom threadu cekati na recv od publisher klijenta
+	return 0;
+}
+DWORD WINAPI SubscriberWork(LPVOID lpParam)
+{
+	//u ovom threadu send pa subscirber klijentu kad publisher nesto stavi u message queue
+	return 0;
+}
 int  main(void)
 {
 	struct Queue* queue = createQueue(1000);
+	struct MessageQueue* message_queue = createMessageQueue(1000);
 	
 	enqueue(queue, "Sport");
 	enqueue(queue, "Fashion");
+
+	int clientsCount = 0;
+
+	HANDLE ClientThreads[NUMBER_OF_CLIENTS];
+	DWORD ClientThreadsID[NUMBER_OF_CLIENTS];
 	
 	// Socket used for listening for new clients 
 	SOCKET listenSocket = INVALID_SOCKET;
 	// Socket used for communication with client
-	SOCKET acceptedSocket = INVALID_SOCKET;
+	SOCKET acceptedSockets[NUMBER_OF_CLIENTS];
 	// variable used to store function return value
 	int iResult;
 	// Buffer used for storing incoming data
@@ -177,9 +215,9 @@ int  main(void)
 		//NEW
 		SelectFunc(iResult, listenSocket, 'r');
 
-		acceptedSocket = accept(listenSocket, NULL, NULL);
+		acceptedSockets[clientsCount] = accept(listenSocket, NULL, NULL);
 
-		if (acceptedSocket == INVALID_SOCKET)
+		if (acceptedSockets[clientsCount] == INVALID_SOCKET)
 		{
 			printf("accept failed with error: %d\n", WSAGetLastError());
 			closesocket(listenSocket);
@@ -187,67 +225,86 @@ int  main(void)
 			return 1;
 		}
 
+
 		do
 		{
 			unsigned long int nonBlockingMode = 1;
-			iResult = ioctlsocket(acceptedSocket, FIONBIO, &nonBlockingMode);
+			iResult = ioctlsocket(acceptedSockets[clientsCount], FIONBIO, &nonBlockingMode);
 
 			if (iResult == SOCKET_ERROR)
 			{
 				printf("ioctlsocket failed with error: %ld\n", WSAGetLastError());
 				return 1;
 			}
-			SelectFunc(iResult, acceptedSocket, 'r');
+			SelectFunc(iResult, acceptedSockets[clientsCount], 'r');
 
 			// Receive data until the client shuts down the connection
 
-			iResult = recv(acceptedSocket, recvbuf, DEFAULT_BUFLEN, 0);
+			iResult = recv(acceptedSockets[clientsCount], recvbuf, DEFAULT_BUFLEN, 0);
 
 			char delimiter[] = ":";
 			char *ptr = strtok(recvbuf, delimiter);
 
-			char *sub = ptr;
+			char *role = ptr;
 			ptr = strtok(NULL, delimiter);
 			char *topic = ptr;
 			ptr = strtok(NULL, delimiter);
+			char *message = ptr;
+			ptr = strtok(NULL, delimiter);
 
-			Subscribe(queue,sub, topic);
+			if (!strcmp(role, "s")) {
+
+				ClientThreads[clientsCount] = CreateThread(NULL, 0, &SubscriberWork, &acceptedSockets[clientsCount], 0, &ClientThreadsID[clientsCount]);
+				Subscribe(queue, acceptedSockets[clientsCount], topic);
+			}
+
+			if (!strcmp(role, "p")) {
+
+				ClientThreads[clientsCount] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &ClientThreadsID[clientsCount]);
+				Publish(message_queue,topic,message);
+			}
 
 			if (iResult > 0)
 			{
-				printf("Subscriber %s subscribed to topic: %s. \n", sub, topic);
+				if (!strcmp(role, "p")) {
+					printf("Publisher published message: %s to topic: %s. \n",message, topic);
+				}
+				if (!strcmp(role, "s")) {
+					printf("Subscriber subscribed to topic: %s. \n", topic);
+				}
 			}
 			else if (iResult == 0)
 			{
 				// connection was closed gracefully
 				printf("Connection with client closed.\n");
-				closesocket(acceptedSocket);
+				closesocket(acceptedSockets[clientsCount]);
 			}
 			else
 			{
 				// there was an error during recv
 				printf("recv failed with error: %d\n", WSAGetLastError());
-				closesocket(acceptedSocket);
+				closesocket(acceptedSockets[clientsCount]);
 			}
 		} while (iResult > 0);
 
 		// here is where server shutdown loguc could be placed
+		clientsCount++;
 
-	} while (1);
+	} while (clientsCount < NUMBER_OF_CLIENTS);
 
 	// shutdown the connection since we're done
-	iResult = shutdown(acceptedSocket, SD_SEND);
+	iResult = shutdown(acceptedSockets[clientsCount], SD_SEND);
 	if (iResult == SOCKET_ERROR)
 	{
 		printf("shutdown failed with error: %d\n", WSAGetLastError());
-		closesocket(acceptedSocket);
+		closesocket(acceptedSockets[clientsCount]);
 		WSACleanup();
 		return 1;
 	}
 
 	// cleanup
 	closesocket(listenSocket);
-	closesocket(acceptedSocket);
+	closesocket(acceptedSockets[clientsCount]);
 	WSACleanup();
 
 	return 0;
@@ -256,7 +313,11 @@ void ExpandQueue(struct Queue* queue) {
 	queue->array = (topic_sub*)realloc(queue->array,queue->size + queue->capacity);
 	queue->capacity += queue->capacity;
 }
-void Subscribe(struct Queue* queue,char* sub, char* topic) {
+void ExpandMessageQueue(struct MessageQueue* queue) {
+	queue->array = (topic_message*)realloc(queue->array, queue->size + queue->capacity);
+	queue->capacity += queue->capacity;
+}
+void Subscribe(struct Queue* queue,SOCKET sub, char* topic) {
 	for (int i = 0; i < queue->size; i++) {
 		if (!strcmp(queue->array[i].topic,topic)) {
 			int index = queue->array[i].size;
@@ -266,17 +327,28 @@ void Subscribe(struct Queue* queue,char* sub, char* topic) {
 	}
 }
 
+void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
+	//enqueue to message_queue
+	topic_message item;
+	item.topic = topic;
+	item.message = message;
+
+	if (message_queue->size == message_queue->capacity)
+		ExpandMessageQueue(message_queue);
+	message_queue->rear = (message_queue->rear + 1) % message_queue->capacity;
+	message_queue->array[message_queue->rear] = item;
+	message_queue->size = message_queue->size + 1;
+	
+}
 void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
 	do {
 		FD_SET set;
 		timeval timeVal;
 
 		FD_ZERO(&set);
-		// Add socket we will wait to read from
+		
 		FD_SET(listenSocket, &set);
 
-		// Set timeouts to zero since we want select to return
-		// instantaneously
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
 
@@ -288,22 +360,19 @@ void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
 		}
 
 
-		// lets check if there was an error during select
 		if (iResult == SOCKET_ERROR)
 		{
 			fprintf(stderr, "select failed with error: %ld\n", WSAGetLastError());
 			continue;
 		}
 
-		// now, lets check if there are any sockets ready
 		if (iResult == 0)
 		{
-			// there are no ready sockets, sleep for a while and check again
 			Sleep(SERVER_SLEEP_TIME);
 			continue;
 		}
 		break;
-		//NEW
+		
 	} while (1);
 
 }

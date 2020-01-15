@@ -89,7 +89,7 @@ int __cdecl main(int argc, char **argv)
 		}
 		else if (c == '2') {
 
-			char message[20] = "s1:Fashion";
+			char message[20] = "s:Fashion";
 
 			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
 			if (iResult == SOCKET_ERROR)
