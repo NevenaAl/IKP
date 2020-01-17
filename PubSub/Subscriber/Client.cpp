@@ -74,7 +74,7 @@ int __cdecl main(int argc, char **argv)
 
 		if (c == '1') {
 
-			char message[20] = "s1:Sport";
+			char message[20] = "s:Sport";
 
 			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
 			if (iResult == SOCKET_ERROR)
@@ -114,6 +114,63 @@ int __cdecl main(int argc, char **argv)
 	}
 	
 
+	//PUBLISHER WHILE
+	/*while (true) {
+
+		printf("\nChoose a topic to publish to: \n\t1. Sport\n\t2. Fashion\n\t3. Politics\n\t4. News \n\t5. Show buisness \n\nPress X if you want to close connection\n");
+
+		char c = _getch();
+		char message[120];
+
+		SelectFunc(iResult, connectSocket, 'w');
+
+		if (c == '1' || c=='2' || c=='3' || c=='4' || c=='5') {
+			if (c == '1') {
+				strcpy(message, "p:Sport");
+			}
+			else if (c == '2') {
+				strcpy(message, "p:Fashion");
+			}
+			else if (c == '3') {
+				strcpy(message, "p:Politics");
+			}
+			else if (c == '4') {
+				strcpy(message, "p:News");
+			}
+			else if (c == '5') {
+				strcpy(message, "p:Show buisness");
+			}
+
+			printf("Enter message you want to publish");
+			char publish_message[100];
+			scanf_s("%s", publish_message);
+		
+			strcat(message, ":");
+			strcat(message, publish_message);
+
+			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
+			if (iResult == SOCKET_ERROR)
+			{
+				printf("send failed with error: %d\n", WSAGetLastError());
+				closesocket(connectSocket);
+				WSACleanup();
+				return 1;
+			}
+		
+
+			printf("Bytes Sent: %ld\n", iResult);
+		}
+		else if (c == 'x' || c == 'X') {
+			closesocket(connectSocket);
+			break;
+		}
+		else {
+			printf("Invalid input.\n");
+			continue;
+		}
+		// Send an prepared message with null terminator included
+	}
+	*/
 
 
 	printf("Bytes Sent: %ld\n", iResult);

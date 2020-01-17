@@ -16,6 +16,9 @@ void Publish(struct MessageQueue*, char*, char*);
 void ExpandQueue(struct Queue*); //da li je potrebno
 void ExpandMessageQueue(struct MessageQueue*);
 
+CRITICAL_SECTION queueAccess;
+CRITICAL_SECTION message_queueAccess;
+
 struct topic_sub {
 	char* topic;
 	SOCKET* subs_array;
@@ -114,8 +117,14 @@ int  main(void)
 	
 	enqueue(queue, "Sport");
 	enqueue(queue, "Fashion");
+	enqueue(queue, "Politics");
+	enqueue(queue, "News");
+	enqueue(queue, "Show buisness");
 
 	int clientsCount = 0;
+
+	InitializeCriticalSection(&queueAccess);
+	InitializeCriticalSection(&message_queueAccess);
 
 	HANDLE ClientThreads[NUMBER_OF_CLIENTS];
 	DWORD ClientThreadsID[NUMBER_OF_CLIENTS];
@@ -208,11 +217,6 @@ int  main(void)
 
 	do
 	{
-		// Wait for clients and accept client connections.
-		// Returning value is acceptedSocket used for further
-		// Client<->Server communication. This version of
-		// server will handle only one client.
-		//NEW
 		SelectFunc(iResult, listenSocket, 'r');
 
 		acceptedSockets[clientsCount] = accept(listenSocket, NULL, NULL);
@@ -250,18 +254,23 @@ int  main(void)
 			char *topic = ptr;
 			ptr = strtok(NULL, delimiter);
 			char *message = ptr;
-			ptr = strtok(NULL, delimiter);
 
 			if (!strcmp(role, "s")) {
 
 				ClientThreads[clientsCount] = CreateThread(NULL, 0, &SubscriberWork, &acceptedSockets[clientsCount], 0, &ClientThreadsID[clientsCount]);
+				EnterCriticalSection(&queueAccess);
 				Subscribe(queue, acceptedSockets[clientsCount], topic);
+				LeaveCriticalSection(&queueAccess);
 			}
 
 			if (!strcmp(role, "p")) {
+				//da li moze gore
+				ptr = strtok(NULL, delimiter);
 
 				ClientThreads[clientsCount] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &ClientThreadsID[clientsCount]);
+				EnterCriticalSection(&message_queueAccess);
 				Publish(message_queue,topic,message);
+				LeaveCriticalSection(&message_queueAccess);
 			}
 
 			if (iResult > 0)
@@ -292,19 +301,37 @@ int  main(void)
 
 	} while (clientsCount < NUMBER_OF_CLIENTS);
 
-	// shutdown the connection since we're done
-	iResult = shutdown(acceptedSockets[clientsCount], SD_SEND);
-	if (iResult == SOCKET_ERROR)
-	{
-		printf("shutdown failed with error: %d\n", WSAGetLastError());
-		closesocket(acceptedSockets[clientsCount]);
-		WSACleanup();
-		return 1;
+	for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
+
+		if (ClientThreads[i])
+			WaitForSingleObject(ClientThreads[i], INFINITE);
 	}
 
+	printf("Server shutting down.");
+
+	DeleteCriticalSection(&queueAccess);
+	DeleteCriticalSection(&message_queueAccess);
+
+	for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
+		SAFE_DELETE_HANDLE(ClientThreads[i]);
+	}
+
+	// shutdown the connection since we're done
+	for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
+
+		iResult = shutdown(acceptedSockets[clientsCount], SD_SEND);
+		if (iResult == SOCKET_ERROR)
+		{
+			printf("shutdown failed with error: %d\n", WSAGetLastError());
+			closesocket(acceptedSockets[clientsCount]);
+			WSACleanup();
+			return 1;
+		}
+		closesocket(acceptedSockets[i]);
+	}
 	// cleanup
 	closesocket(listenSocket);
-	closesocket(acceptedSockets[clientsCount]);
+	
 	WSACleanup();
 
 	return 0;
