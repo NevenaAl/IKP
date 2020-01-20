@@ -16,6 +16,9 @@
 // Returns true if succeeded, false otherwise.
 bool InitializeWindowsSockets();
 void SelectFunc(int, SOCKET, char);
+void PrintMenu();
+void ProcessInputAndGenerateMessage(char input, char* message);
+
 int __cdecl main(int argc, char **argv)
 {
 	// socket used to communicate with server
@@ -66,30 +69,17 @@ int __cdecl main(int argc, char **argv)
 
 	while (true) {
 
-		printf("\nChoose a topic to subscribe to: \n\t1. Sport\n\t2. Fashion\n\t3. Politics\n\t4. News \n\t5. Show buisness \n\nPress X if you want to close connection\n");
+		PrintMenu();
 		
 		char c = _getch();
 
 		SelectFunc(iResult, connectSocket, 'w');
 
-		if (c == '1') {
+		char message[20];
 
-			char message[20] = "s:Sport";
+		if (c == '1' || c == '2' || c == '3' || c == '4' || c == '5') {
 
-			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
-			if (iResult == SOCKET_ERROR)
-			{
-				printf("send failed with error: %d\n", WSAGetLastError());
-				closesocket(connectSocket);
-				WSACleanup();
-				return 1;
-			}
-
-			printf("Bytes Sent: %ld\n", iResult);
-		}
-		else if (c == '2') {
-
-			char message[20] = "s:Fashion";
+			ProcessInputAndGenerateMessage(c, message);
 
 			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
 			if (iResult == SOCKET_ERROR)
@@ -101,6 +91,7 @@ int __cdecl main(int argc, char **argv)
 			}
 
 			printf("Bytes Sent: %ld\n", iResult);
+			break;
 		}
 		else if (c == 'x' || c == 'X') {
 			closesocket(connectSocket);
@@ -113,70 +104,9 @@ int __cdecl main(int argc, char **argv)
 		// Send an prepared message with null terminator included
 	}
 	
+	//printf("Bytes Sent: %ld\n", iResult);
 
-	//PUBLISHER WHILE
-	/*while (true) {
-
-		printf("\nChoose a topic to publish to: \n\t1. Sport\n\t2. Fashion\n\t3. Politics\n\t4. News \n\t5. Show buisness \n\nPress X if you want to close connection\n");
-
-		char c = _getch();
-		char message[120];
-
-		SelectFunc(iResult, connectSocket, 'w');
-
-		if (c == '1' || c=='2' || c=='3' || c=='4' || c=='5') {
-			if (c == '1') {
-				strcpy(message, "p:Sport");
-			}
-			else if (c == '2') {
-				strcpy(message, "p:Fashion");
-			}
-			else if (c == '3') {
-				strcpy(message, "p:Politics");
-			}
-			else if (c == '4') {
-				strcpy(message, "p:News");
-			}
-			else if (c == '5') {
-				strcpy(message, "p:Show buisness");
-			}
-
-			printf("Enter message you want to publish");
-			char publish_message[100];
-			scanf_s("%s", publish_message);
-		
-			strcat(message, ":");
-			strcat(message, publish_message);
-
-			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
-			if (iResult == SOCKET_ERROR)
-			{
-				printf("send failed with error: %d\n", WSAGetLastError());
-				closesocket(connectSocket);
-				WSACleanup();
-				return 1;
-			}
-		
-
-			printf("Bytes Sent: %ld\n", iResult);
-		}
-		else if (c == 'x' || c == 'X') {
-			closesocket(connectSocket);
-			break;
-		}
-		else {
-			printf("Invalid input.\n");
-			continue;
-		}
-		// Send an prepared message with null terminator included
-	}
-	*/
-
-
-	printf("Bytes Sent: %ld\n", iResult);
-	while (!kbhit()) {
-
-	}
+	char ch = _getch();
 
 	// cleanup
 	closesocket(connectSocket);
@@ -236,4 +166,36 @@ void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
 		//NEW
 	} while (1);
 
+}
+
+void PrintMenu() {
+	printf("\nChoose a topic to subscribe to: \n");
+	printf("\t1.Sport\n");
+	printf("\t2.Fashion\n");
+	printf("\t3.Politics\n");
+	printf("\t4.News \n");
+	printf("\t5.Show buisness \n\n");
+	printf("Press X if you want to close connection\n");
+}
+
+void ProcessInputAndGenerateMessage(char input, char* message) {
+	switch (input) {
+	case '1':
+		strcpy(message, "s:Sport");
+		break;
+	case '2':
+		strcpy(message, "s:Fashion");
+		break;
+	case '3':
+		strcpy(message, "s:Politics");
+		break;
+	case '4':
+		strcpy(message, "s:News");
+		break;
+	case '5':
+		strcpy(message, "s:Show business");
+		break;
+	default:
+		break;
+	}
 }

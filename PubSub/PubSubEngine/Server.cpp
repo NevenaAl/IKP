@@ -1,7 +1,9 @@
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "Queue.h"
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27016"
@@ -13,121 +15,76 @@ bool InitializeWindowsSockets();
 void SelectFunc(int, SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
 void Publish(struct MessageQueue*, char*, char*);
-void ExpandQueue(struct Queue*); //da li je potrebno
-void ExpandMessageQueue(struct MessageQueue*);
 
 CRITICAL_SECTION queueAccess;
 CRITICAL_SECTION message_queueAccess;
 
-struct topic_sub {
-	char* topic;
-	SOCKET* subs_array;
-	int size;
-};
-struct topic_message {
-	char* topic;
-	char* message;
-};
-struct Queue
-{
-	int front, rear, size;
-	unsigned capacity;
-	topic_sub* array;
-};
-struct MessageQueue
-{
-	int front, rear, size;
-	unsigned capacity;
-	topic_message* array;
-};
+struct Queue* queue = CreateQueue(1000);
+struct MessageQueue* message_queue = CreateMessageQueue(1000);
 
-// function to create a queue of given capacity.  
-// It initializes size of queue as 0 
-struct Queue* createQueue(unsigned capacity)
-{
-	struct Queue* queue = (struct Queue*) malloc(sizeof(struct Queue));
-	queue->capacity = capacity;
-	queue->front = queue->size = 0;
-	queue->rear = capacity - 1;  // This is important, see the enqueue 
-	queue->array = (topic_sub*)malloc(queue->capacity * sizeof(topic_sub));
-	return queue;
-}
-struct MessageQueue* createMessageQueue(unsigned capacity)
-{
-	struct MessageQueue* queue = (struct MessageQueue*) malloc(sizeof(struct MessageQueue));
-	queue->capacity = capacity;
-	queue->front = queue->size = 0;
-	queue->rear = capacity - 1;  // This is important, see the enqueue 
-	queue->array = (topic_message*)malloc(queue->capacity * sizeof(topic_message));
-	return queue;
-}
-
-// Queue is full when size becomes equal to the capacity  
-int isFull(struct Queue* queue)
-{
-	return (queue->size == queue->capacity);
-}
-
-// Queue is empty when size is 0 
-int isEmpty(struct Queue* queue)
-{
-	return (queue->size == 0);
-}
-
-// Function to add an item to the queue.   
-// It changes rear and size 
-void enqueue(struct Queue* queue, char* topic)
-{
-	topic_sub item;
-	item.topic = topic;
-	item.subs_array = (SOCKET*)malloc(300);
-	item.size = 0;
-
-	if (isFull(queue))
-	   ExpandQueue(queue);
-	queue->rear = (queue->rear + 1) % queue->capacity;
-	queue->array[queue->rear] = item;
-	queue->size = queue->size + 1;
-	printf("%s enqueued to queue\n", item.topic);
-}
-
-topic_sub dequeue(struct Queue* queue)
-{
-	//if (isEmpty(queue))
-//		return;
-	topic_sub item = queue->array[queue->front];
-	queue->front = (queue->front + 1) % queue->capacity;
-	queue->size = queue->size - 1;
-	return item;
-}
 DWORD WINAPI PublisherWork(LPVOID lpParam) 
 {
-	//u ovom threadu cekati na recv od publisher klijenta
-	return 0;
+	int iResult = 0;
+	char recvbuf[DEFAULT_BUFLEN];
+	SOCKET recvSocket = *(SOCKET*)lpParam;
+
+	while (true) {
+		SelectFunc(iResult, recvSocket, 'r');
+
+		iResult = recv(recvSocket, recvbuf, DEFAULT_BUFLEN, 0);
+
+		char delimiter[] = ":";
+		char *ptr = strtok(recvbuf, delimiter);
+
+		char *role = ptr;
+		ptr = strtok(NULL, delimiter);
+		char *topic = ptr;
+		ptr = strtok(NULL, delimiter);
+		char *message = ptr;
+
+		if (!strcmp(role, "p")) {
+			ptr = strtok(NULL, delimiter);
+			EnterCriticalSection(&message_queueAccess);
+			Publish(message_queue, topic, message);
+			LeaveCriticalSection(&message_queueAccess);
+		}
+	}
+	return 1;
 }
 DWORD WINAPI SubscriberWork(LPVOID lpParam)
 {
 	//u ovom threadu send pa subscirber klijentu kad publisher nesto stavi u message queue
-	return 0;
+	//return 0;
+	SOCKET sendSocket = *(SOCKET*)lpParam;
+
+	while (true) {
+		
+	}
 }
+
 int  main(void)
 {
-	struct Queue* queue = createQueue(1000);
-	struct MessageQueue* message_queue = createMessageQueue(1000);
-	
-	enqueue(queue, "Sport");
-	enqueue(queue, "Fashion");
-	enqueue(queue, "Politics");
-	enqueue(queue, "News");
-	enqueue(queue, "Show buisness");
+	Enqueue(queue, "Sport");
+	Enqueue(queue, "Fashion");
+	Enqueue(queue, "Politics");
+	Enqueue(queue, "News");
+	Enqueue(queue, "Show buisness");
 
 	int clientsCount = 0;
+	int numberOfPublishers = 0;
+	int numberOfSubscribers = 0;
 
 	InitializeCriticalSection(&queueAccess);
 	InitializeCriticalSection(&message_queueAccess);
 
-	HANDLE ClientThreads[NUMBER_OF_CLIENTS];
-	DWORD ClientThreadsID[NUMBER_OF_CLIENTS];
+	/*HANDLE ClientThreads[NUMBER_OF_CLIENTS];
+	DWORD ClientThreadsID[NUMBER_OF_CLIENTS];*/
+
+	HANDLE PublisherThreads[NUMBER_OF_CLIENTS];
+	DWORD PublisherThreadsID[NUMBER_OF_CLIENTS]; 
+
+	HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
+	DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS]; 
 	
 	// Socket used for listening for new clients 
 	SOCKET listenSocket = INVALID_SOCKET;
@@ -229,23 +186,12 @@ int  main(void)
 			return 1;
 		}
 
+		SelectFunc(iResult, acceptedSockets[clientsCount], 'r');
 
-		do
+		iResult = recv(acceptedSockets[clientsCount], recvbuf, DEFAULT_BUFLEN, 0);
+
+		if (iResult > 0)
 		{
-			unsigned long int nonBlockingMode = 1;
-			iResult = ioctlsocket(acceptedSockets[clientsCount], FIONBIO, &nonBlockingMode);
-
-			if (iResult == SOCKET_ERROR)
-			{
-				printf("ioctlsocket failed with error: %ld\n", WSAGetLastError());
-				return 1;
-			}
-			SelectFunc(iResult, acceptedSockets[clientsCount], 'r');
-
-			// Receive data until the client shuts down the connection
-
-			iResult = recv(acceptedSockets[clientsCount], recvbuf, DEFAULT_BUFLEN, 0);
-
 			char delimiter[] = ":";
 			char *ptr = strtok(recvbuf, delimiter);
 
@@ -256,55 +202,48 @@ int  main(void)
 			char *message = ptr;
 
 			if (!strcmp(role, "s")) {
-
-				ClientThreads[clientsCount] = CreateThread(NULL, 0, &SubscriberWork, &acceptedSockets[clientsCount], 0, &ClientThreadsID[clientsCount]);
+				SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberWork, &acceptedSockets[clientsCount], 0, &SubscriberThreadsID[numberOfSubscribers]);
 				EnterCriticalSection(&queueAccess);
 				Subscribe(queue, acceptedSockets[clientsCount], topic);
 				LeaveCriticalSection(&queueAccess);
+				numberOfSubscribers++;
+				printf("Subscriber subscribed to topic: %s. \n", topic);
 			}
 
 			if (!strcmp(role, "p")) {
-				//da li moze gore
-				ptr = strtok(NULL, delimiter);
 
-				ClientThreads[clientsCount] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &ClientThreadsID[clientsCount]);
-				EnterCriticalSection(&message_queueAccess);
-				Publish(message_queue,topic,message);
-				LeaveCriticalSection(&message_queueAccess);
+				PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &PublisherThreadsID[numberOfPublishers]);
+				printf("Publisher connected.\n");
+				numberOfPublishers++;
 			}
-
-			if (iResult > 0)
-			{
-				if (!strcmp(role, "p")) {
-					printf("Publisher published message: %s to topic: %s. \n",message, topic);
-				}
-				if (!strcmp(role, "s")) {
-					printf("Subscriber subscribed to topic: %s. \n", topic);
-				}
-			}
-			else if (iResult == 0)
-			{
-				// connection was closed gracefully
-				printf("Connection with client closed.\n");
-				closesocket(acceptedSockets[clientsCount]);
-			}
-			else
-			{
-				// there was an error during recv
-				printf("recv failed with error: %d\n", WSAGetLastError());
-				closesocket(acceptedSockets[clientsCount]);
-			}
-		} while (iResult > 0);
-
-		// here is where server shutdown loguc could be placed
+		}
+		else if (iResult == 0)
+		{
+			// connection was closed gracefully
+			printf("Connection with client closed.\n");
+			closesocket(acceptedSockets[clientsCount]);
+		}
+		else
+		{
+			// there was an error during recv
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(acceptedSockets[clientsCount]);
+		}
+		
 		clientsCount++;
 
 	} while (clientsCount < NUMBER_OF_CLIENTS);
 
-	for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
+	for (int i = 0; i < numberOfPublishers; i++) {
 
-		if (ClientThreads[i])
-			WaitForSingleObject(ClientThreads[i], INFINITE);
+		if (PublisherThreads[i])
+			WaitForSingleObject(PublisherThreads[i], INFINITE);
+	}
+
+	for (int i = 0; i < numberOfSubscribers; i++) {
+
+		if (SubscriberThreads[i])
+			WaitForSingleObject(SubscriberThreads[i], INFINITE);
 	}
 
 	printf("Server shutting down.");
@@ -312,8 +251,12 @@ int  main(void)
 	DeleteCriticalSection(&queueAccess);
 	DeleteCriticalSection(&message_queueAccess);
 
-	for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
-		SAFE_DELETE_HANDLE(ClientThreads[i]);
+	for (int i = 0; i < numberOfPublishers; i++) {
+		SAFE_DELETE_HANDLE(PublisherThreads[i]);
+	}
+
+	for (int i = 0; i < numberOfSubscribers; i++) {
+		SAFE_DELETE_HANDLE(SubscriberThreads[i]);
 	}
 
 	// shutdown the connection since we're done
@@ -336,14 +279,7 @@ int  main(void)
 
 	return 0;
 }
-void ExpandQueue(struct Queue* queue) {
-	queue->array = (topic_sub*)realloc(queue->array,queue->size + queue->capacity);
-	queue->capacity += queue->capacity;
-}
-void ExpandMessageQueue(struct MessageQueue* queue) {
-	queue->array = (topic_message*)realloc(queue->array, queue->size + queue->capacity);
-	queue->capacity += queue->capacity;
-}
+
 void Subscribe(struct Queue* queue,SOCKET sub, char* topic) {
 	for (int i = 0; i < queue->size; i++) {
 		if (!strcmp(queue->array[i].topic,topic)) {
@@ -355,17 +291,14 @@ void Subscribe(struct Queue* queue,SOCKET sub, char* topic) {
 }
 
 void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
-	//enqueue to message_queue
+	//Enqueue to message_queue
 	topic_message item;
 	item.topic = topic;
 	item.message = message;
 
-	if (message_queue->size == message_queue->capacity)
-		ExpandMessageQueue(message_queue);
-	message_queue->rear = (message_queue->rear + 1) % message_queue->capacity;
-	message_queue->array[message_queue->rear] = item;
-	message_queue->size = message_queue->size + 1;
+	EnqueueMessageQueue(message_queue, item);
 	
+	printf("Publisher published message: %s to topic: %s\n", item.message, item.topic);
 }
 void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
 	do {
