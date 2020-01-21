@@ -23,6 +23,7 @@ int __cdecl main(int argc, char **argv)
 {
 	// socket used to communicate with server
 	SOCKET connectSocket = INVALID_SOCKET;
+	char recvbuf[DEFAULT_BUFLEN];
 	// variable used to store function return value
 	int iResult;
 
@@ -105,6 +106,33 @@ int __cdecl main(int argc, char **argv)
 	}
 	
 	//printf("Bytes Sent: %ld\n", iResult);
+
+	
+		SelectFunc(iResult, connectSocket, 'r');
+
+		iResult = recv(connectSocket, recvbuf, 4, 0);
+		int bytesExpected = *((int*)recvbuf);
+
+		char* messageReceived = (char*)malloc(bytesExpected);
+		iResult = recv(connectSocket, messageReceived, bytesExpected, 0);
+
+		if (iResult > 0)
+		{
+			printf("Message received: %s", messageReceived);
+		}
+		else if (iResult == 0)
+		{
+			// connection was closed gracefully
+			printf("Connection with server closed.\n");
+			closesocket(connectSocket);
+		}
+		else
+		{
+			// there was an error during recv
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(connectSocket);
+		}
+
 
 	char ch = _getch();
 

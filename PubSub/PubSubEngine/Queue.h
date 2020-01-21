@@ -4,7 +4,7 @@
 
 struct topic_sub {
 	char* topic;
-	SOCKET* subs_array;
+	SOCKET subs_array[10];
 	int size;
 };
 struct topic_message {
@@ -82,7 +82,7 @@ void Enqueue(struct Queue* queue, char* topic)
 {
 	topic_sub item;
 	item.topic = topic;
-	item.subs_array = (SOCKET*)malloc(300);
+	//item.subs_array = (SOCKET)malloc(sizeof(SOCKET));
 	item.size = 0;
 
 	if (IsFull(queue))

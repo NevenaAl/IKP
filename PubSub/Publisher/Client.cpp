@@ -90,7 +90,7 @@ int __cdecl main(int argc, char **argv)
 
 		char message[120];
 
-		SelectFunc(iResult, connectSocket, 'w');
+		
 
 		if (c == '1' || c=='2' || c=='3' || c=='4' || c=='5') {
 			
@@ -100,6 +100,7 @@ int __cdecl main(int argc, char **argv)
 
 			EnterAndGenerateMessage(publish_message, message);
 
+			SelectFunc(iResult, connectSocket, 'w');
 			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
 			if (iResult == SOCKET_ERROR)
 			{

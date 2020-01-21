@@ -18,6 +18,7 @@ void Publish(struct MessageQueue*, char*, char*);
 
 CRITICAL_SECTION queueAccess;
 CRITICAL_SECTION message_queueAccess;
+HANDLE hSemaphore;
 
 struct Queue* queue = CreateQueue(1000);
 struct MessageQueue* message_queue = CreateMessageQueue(1000);
@@ -47,6 +48,7 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 			EnterCriticalSection(&message_queueAccess);
 			Publish(message_queue, topic, message);
 			LeaveCriticalSection(&message_queueAccess);
+			ReleaseSemaphore(hSemaphore, 1, NULL);
 		}
 	}
 	return 1;
@@ -55,11 +57,53 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 {
 	//u ovom threadu send pa subscirber klijentu kad publisher nesto stavi u message queue
 	//return 0;
-	SOCKET sendSocket = *(SOCKET*)lpParam;
+	int iResult = 0;
+	SOCKET sendSocket;
 
-	while (true) {
-		
+	WaitForSingleObject(hSemaphore, INFINITE);
+	EnterCriticalSection(&message_queueAccess);
+	topic_message item = DequeueMessageQueue(message_queue);
+ 	LeaveCriticalSection(&message_queueAccess);
+	printf("Topic: %s\n", item.topic);
+	
+	char* messageToSend = item.message;
+	int messagesize = strlen(messageToSend) + 1 + sizeof(int);
+	char* bufferToSend = (char*)malloc(messagesize);
+	char* toSend = bufferToSend;
+	*((int*)bufferToSend) = int(strlen(messageToSend));
+	bufferToSend+=4;
+	memcpy((char*)bufferToSend, messageToSend, int(strlen(messageToSend)+1));
+
+	//poslati svim pretplacenim
+	for (int i = 0; i < queue->size; i++)
+	{
+		for (int j = 0; j < queue[i].array->size; j++)
+		{
+			if (!strcmp(queue[i].array[j].topic, item.topic)) {
+				for (int y = 0; y < queue[i].array[j].size; y++)
+				{
+					sendSocket = queue[i].array[j].subs_array[y];
+					SelectFunc(iResult, sendSocket, 'w');
+					iResult = send(sendSocket, toSend, messagesize, 0);
+					if (iResult == SOCKET_ERROR)
+					{
+						printf("send failed with error: %d\n", WSAGetLastError());
+						closesocket(sendSocket);
+						WSACleanup();
+						return 1;
+					}
+
+					printf("Bytes Sent: %ld\n", iResult);
+				}
+				break;
+			}
+		}
 	}
+
+	
+
+	
+	return 1;
 }
 
 int  main(void)
@@ -76,6 +120,8 @@ int  main(void)
 
 	InitializeCriticalSection(&queueAccess);
 	InitializeCriticalSection(&message_queueAccess);
+
+	hSemaphore = CreateSemaphore(0, 0, 1, NULL);
 
 	/*HANDLE ClientThreads[NUMBER_OF_CLIENTS];
 	DWORD ClientThreadsID[NUMBER_OF_CLIENTS];*/
@@ -277,6 +323,9 @@ int  main(void)
 	
 	WSACleanup();
 
+	free(queue);
+	free(message_queue);
+
 	return 0;
 }
 
@@ -286,6 +335,7 @@ void Subscribe(struct Queue* queue,SOCKET sub, char* topic) {
 			int index = queue->array[i].size;
 			queue->array[i].subs_array[index] = sub;
 			queue->array[i].size++;
+			//printf("%s", queue->array[i].subs_array[index]);
 		}
 	}
 }
