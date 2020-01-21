@@ -1,26 +1,10 @@
-#define _CRT_SECURE_NO_WARNINGS
-
-#include <ws2tcpip.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include "Queue.h"
-
-#define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT "27016"
-#define SERVER_SLEEP_TIME 50
-#define NUMBER_OF_CLIENTS 20
-#define SAFE_DELETE_HANDLE(h) {if(h)CloseHandle(h);}
-
-bool InitializeWindowsSockets();
-void SelectFunc(int, SOCKET, char);
-void Subscribe(struct Queue*, SOCKET, char*);
-void Publish(struct MessageQueue*, char*, char*);
+#include "PubSub.h"
 
 CRITICAL_SECTION queueAccess;
 CRITICAL_SECTION message_queueAccess;
 HANDLE hSemaphore;
 
-struct Queue* queue = CreateQueue(1000);
+struct Queue* queue = CreateQueue(2);
 struct MessageQueue* message_queue = CreateMessageQueue(1000);
 
 DWORD WINAPI PublisherWork(LPVOID lpParam) 
@@ -65,42 +49,47 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 	topic_message item = DequeueMessageQueue(message_queue);
  	LeaveCriticalSection(&message_queueAccess);
 	printf("Topic: %s\n", item.topic);
+	printf("message: %s\n", item.message);
 	
-	char* messageToSend = item.message;
+	/*char* messageToSend = item.message;
 	int messagesize = strlen(messageToSend) + 1 + sizeof(int);
 	char* bufferToSend = (char*)malloc(messagesize);
 	char* toSend = bufferToSend;
 	*((int*)bufferToSend) = int(strlen(messageToSend));
 	bufferToSend+=4;
-	memcpy((char*)bufferToSend, messageToSend, int(strlen(messageToSend)+1));
+	memcpy((char*)bufferToSend, messageToSend, int(strlen(messageToSend)+1));*/
+
+	int messageSize = int(strlen(item.message) + strlen(item.topic) + 2 + sizeof(int));
+	printf("message size: %d", messageSize);
+	char* toSend = (char*)malloc(messageSize);
+	char* buffer = toSend;
+	*((int*)toSend) = messageSize;
+	toSend += 4;
+	memcpy(toSend, (char*)&item, 4);
+	char* structtosend = (char*)&item;
 
 	//poslati svim pretplacenim
 	for (int i = 0; i < queue->size; i++)
 	{
-		for (int j = 0; j < queue[i].array->size; j++)
-		{
-			if (!strcmp(queue[i].array[j].topic, item.topic)) {
-				for (int y = 0; y < queue[i].array[j].size; y++)
+		if (!strcmp(queue->array[i].topic, item.topic)) {
+			for (int j = 0; j < queue->array[i].size; j++)
+			{
+				sendSocket = queue->array[i].subs_array[j];
+				SelectFunc(iResult, sendSocket, 'w');
+				iResult = send(sendSocket, (char*)&item, sizeof(topic_message), 0);
+				if (iResult == SOCKET_ERROR)
 				{
-					sendSocket = queue[i].array[j].subs_array[y];
-					SelectFunc(iResult, sendSocket, 'w');
-					iResult = send(sendSocket, toSend, messagesize, 0);
-					if (iResult == SOCKET_ERROR)
-					{
-						printf("send failed with error: %d\n", WSAGetLastError());
-						closesocket(sendSocket);
-						WSACleanup();
-						return 1;
-					}
-
-					printf("Bytes Sent: %ld\n", iResult);
+					printf("send failed with error: %d\n", WSAGetLastError());
+					closesocket(sendSocket);
+					WSACleanup();
+					return 1;
 				}
-				break;
+
+				printf("Bytes Sent: %ld\n", iResult);
 			}
 		}
+		
 	}
-
-	
 
 	
 	return 1;
@@ -112,7 +101,7 @@ int  main(void)
 	Enqueue(queue, "Fashion");
 	Enqueue(queue, "Politics");
 	Enqueue(queue, "News");
-	Enqueue(queue, "Show buisness");
+	Enqueue(queue, "Show business");
 
 	int clientsCount = 0;
 	int numberOfPublishers = 0;
@@ -327,75 +316,5 @@ int  main(void)
 	free(message_queue);
 
 	return 0;
-}
-
-void Subscribe(struct Queue* queue,SOCKET sub, char* topic) {
-	for (int i = 0; i < queue->size; i++) {
-		if (!strcmp(queue->array[i].topic,topic)) {
-			int index = queue->array[i].size;
-			queue->array[i].subs_array[index] = sub;
-			queue->array[i].size++;
-			//printf("%s", queue->array[i].subs_array[index]);
-		}
-	}
-}
-
-void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
-	//Enqueue to message_queue
-	topic_message item;
-	item.topic = topic;
-	item.message = message;
-
-	EnqueueMessageQueue(message_queue, item);
-	
-	printf("Publisher published message: %s to topic: %s\n", item.message, item.topic);
-}
-void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
-	do {
-		FD_SET set;
-		timeval timeVal;
-
-		FD_ZERO(&set);
-		
-		FD_SET(listenSocket, &set);
-
-		timeVal.tv_sec = 0;
-		timeVal.tv_usec = 0;
-
-		if (rw == 'r') {
-			iResult = select(0 /* ignored */, &set, NULL, NULL, &timeVal);
-		}
-		else {
-			iResult = select(0 /* ignored */, NULL, &set, NULL, &timeVal);
-		}
-
-
-		if (iResult == SOCKET_ERROR)
-		{
-			fprintf(stderr, "select failed with error: %ld\n", WSAGetLastError());
-			continue;
-		}
-
-		if (iResult == 0)
-		{
-			Sleep(SERVER_SLEEP_TIME);
-			continue;
-		}
-		break;
-		
-	} while (1);
-
-}
-
-bool InitializeWindowsSockets()
-{
-	WSADATA wsaData;
-	// Initialize windows sockets library for this process
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-	{
-		printf("WSAStartup failed with error: %d\n", WSAGetLastError());
-		return false;
-	}
-	return true;
 }
 

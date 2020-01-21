@@ -1,15 +1,18 @@
 #pragma once
 #include "winsock2.h"
 #include <stdio.h>
+#define NUM_OF_SUBS 20
+#define TOPIC_LEN 15
+#define MESSAGE_LEN 250
 
 struct topic_sub {
 	char* topic;
-	SOCKET subs_array[10];
+	SOCKET subs_array[NUM_OF_SUBS];
 	int size;
 };
 struct topic_message {
-	char* topic;
-	char* message;
+	char topic[TOPIC_LEN];
+	char message[MESSAGE_LEN];
 };
 struct Queue
 {
@@ -25,12 +28,12 @@ struct MessageQueue
 };
 
 void ExpandQueue(struct Queue* queue) {
-	queue->array = (topic_sub*)realloc(queue->array, queue->size + queue->capacity);
-	queue->capacity += queue->capacity;
+	queue->array = (topic_sub*)realloc(queue->array, queue->size * (sizeof(topic_sub)) + sizeof(topic_sub)); 
+	queue->capacity += 1;
 }
 void ExpandMessageQueue(struct MessageQueue* queue) {
-	queue->array = (topic_message*)realloc(queue->array, queue->size + queue->capacity);
-	queue->capacity += queue->capacity;
+	queue->array = (topic_message*)realloc(queue->array, queue->size*(sizeof(topic_message)) + sizeof(topic_message));
+	queue->capacity += 1;
 }
 
 struct Queue* CreateQueue(unsigned capacity)
@@ -82,7 +85,7 @@ void Enqueue(struct Queue* queue, char* topic)
 {
 	topic_sub item;
 	item.topic = topic;
-	//item.subs_array = (SOCKET)malloc(sizeof(SOCKET));
+	//item.subs_array;
 	item.size = 0;
 
 	if (IsFull(queue))
