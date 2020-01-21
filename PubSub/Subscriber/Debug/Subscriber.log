@@ -12,8 +12,8 @@ c:\users\tanja\onedrive\documents\github\ikp\pubsub\subscriber\subscriber.h(98):
   c:\program files (x86)\windows kits\10\include\10.0.17763.0\ucrt\string.h(133): note: see declaration of 'strcpy'
 c:\users\tanja\onedrive\documents\github\ikp\pubsub\subscriber\client.cpp(41): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
   c:\program files (x86)\windows kits\10\include\10.0.17763.0\um\winsock2.h(1831): note: see declaration of 'inet_addr'
-c:\users\tanja\onedrive\documents\github\ikp\pubsub\subscriber\client.cpp(109): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+c:\users\tanja\onedrive\documents\github\ikp\pubsub\subscriber\client.cpp(106): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.17763.0\ucrt\string.h(133): note: see declaration of 'strcpy'
-c:\users\tanja\onedrive\documents\github\ikp\pubsub\subscriber\client.cpp(110): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+c:\users\tanja\onedrive\documents\github\ikp\pubsub\subscriber\client.cpp(107): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
   c:\program files (x86)\windows kits\10\include\10.0.17763.0\ucrt\string.h(133): note: see declaration of 'strcpy'
   Subscriber.vcxproj -> C:\Users\tanja\OneDrive\Documents\GitHub\IKP\PubSub\Debug\Subscriber.exe

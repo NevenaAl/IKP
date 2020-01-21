@@ -81,6 +81,7 @@
     <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Dictionary.h" />
     <ClInclude Include="PubSub.h" />
     <ClInclude Include="Queue.h" />
   </ItemGroup>

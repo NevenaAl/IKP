@@ -24,7 +24,6 @@ void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 			int index = queue->array[i].size;
 			queue->array[i].subs_array[index] = sub;
 			queue->array[i].size++;
-			//printf("%s", queue->array[i].subs_array[index]);
 		}
 	}
 }

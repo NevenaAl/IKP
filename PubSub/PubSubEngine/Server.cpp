@@ -1,11 +1,55 @@
 #include "PubSub.h"
+#include "Dictionary.h"
 
 CRITICAL_SECTION queueAccess;
 CRITICAL_SECTION message_queueAccess;
-HANDLE hSemaphore;
+
+HANDLE pubSubSemaphore;
+
 
 struct Queue* queue = CreateQueue(2);
 struct MessageQueue* message_queue = CreateMessageQueue(1000);
+topic_message current;
+struct node subscribers[20];
+
+DWORD WINAPI PubSubWork(LPVOID lpParam) {
+	//u ovom threadu send pa subscirber klijentu kad publisher nesto stavi u message queue
+	//return 0;
+	int iResult = 0;
+	SOCKET sendSocket;
+	while (true) {
+		WaitForSingleObject(pubSubSemaphore, INFINITE);
+
+		EnterCriticalSection(&message_queueAccess);
+		current = DequeueMessageQueue(message_queue);
+		LeaveCriticalSection(&message_queueAccess);
+
+		printf("Topic: %s\n", current.topic);
+		printf("message: %s\n\n", current.message);
+
+		int numOfSockets = 0;
+		//poslati svim pretplacenim
+		for (int i = 0; i < queue->size; i++)
+		{
+			if (!strcmp(queue->array[i].topic, current.topic)) {
+				for (int j = 0; j < queue->array[i].size; j++)
+				{
+					sendSocket = queue->array[i].subs_array[j];
+					for (int i = 0; i < (sizeof(subscribers) / sizeof(node)); i++)
+					{
+						if (subscribers[i].sendTo == sendSocket) {
+							ReleaseSemaphore(subscribers[i].hSemaphore, 1, NULL);
+							break;
+						}
+					}
+				}
+			}
+
+		}
+
+	}
+	return 1;
+}
 
 DWORD WINAPI PublisherWork(LPVOID lpParam) 
 {
@@ -32,68 +76,41 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 			EnterCriticalSection(&message_queueAccess);
 			Publish(message_queue, topic, message);
 			LeaveCriticalSection(&message_queueAccess);
-			ReleaseSemaphore(hSemaphore, 1, NULL);
+			ReleaseSemaphore(pubSubSemaphore, 1, NULL);
 		}
 	}
 	return 1;
 }
 DWORD WINAPI SubscriberWork(LPVOID lpParam)
 {
-	//u ovom threadu send pa subscirber klijentu kad publisher nesto stavi u message queue
-	//return 0;
 	int iResult = 0;
-	SOCKET sendSocket;
-
-	WaitForSingleObject(hSemaphore, INFINITE);
-	EnterCriticalSection(&message_queueAccess);
-	topic_message item = DequeueMessageQueue(message_queue);
- 	LeaveCriticalSection(&message_queueAccess);
-	printf("Topic: %s\n", item.topic);
-	printf("message: %s\n", item.message);
-	
-	/*char* messageToSend = item.message;
-	int messagesize = strlen(messageToSend) + 1 + sizeof(int);
-	char* bufferToSend = (char*)malloc(messagesize);
-	char* toSend = bufferToSend;
-	*((int*)bufferToSend) = int(strlen(messageToSend));
-	bufferToSend+=4;
-	memcpy((char*)bufferToSend, messageToSend, int(strlen(messageToSend)+1));*/
-
-	int messageSize = int(strlen(item.message) + strlen(item.topic) + 2 + sizeof(int));
-	printf("message size: %d", messageSize);
-	char* toSend = (char*)malloc(messageSize);
-	char* buffer = toSend;
-	*((int*)toSend) = messageSize;
-	toSend += 4;
-	memcpy(toSend, (char*)&item, 4);
-	char* structtosend = (char*)&item;
-
-	//poslati svim pretplacenim
-	for (int i = 0; i < queue->size; i++)
-	{
-		if (!strcmp(queue->array[i].topic, item.topic)) {
-			for (int j = 0; j < queue->array[i].size; j++)
-			{
-				sendSocket = queue->array[i].subs_array[j];
-				SelectFunc(iResult, sendSocket, 'w');
-				iResult = send(sendSocket, (char*)&item, sizeof(topic_message), 0);
-				if (iResult == SOCKET_ERROR)
-				{
-					printf("send failed with error: %d\n", WSAGetLastError());
-					closesocket(sendSocket);
-					WSACleanup();
-					return 1;
-				}
-
-				printf("Bytes Sent: %ld\n", iResult);
+	SOCKET sendSocket = *(SOCKET*)lpParam;
+	//HANDLE mySem = nullptr;
+	while (true) {
+		for (int i = 0; i < (sizeof(subscribers)/sizeof(node)); i++)
+		{
+			if (sendSocket == subscribers[i].sendTo) {
+				WaitForSingleObject(subscribers[i].hSemaphore, INFINITE);
+				break;
 			}
 		}
-		
-	}
+		//WaitForSingleObject(mySem, INFINITE);
 
-	
+		SelectFunc(iResult, *(SOCKET*)lpParam, 'w');
+		iResult = send(*(SOCKET*)lpParam, (char*)&current, sizeof(topic_message), 0);
+		if (iResult == SOCKET_ERROR)
+		{
+			printf("send failed with error: %d\n", WSAGetLastError());
+			closesocket(sendSocket);
+			WSACleanup();
+			return 1;
+		}
+
+		printf("Bytes Sentttt: %ld\n", iResult);
+	}
 	return 1;
 }
+	
 
 int  main(void)
 {
@@ -110,17 +127,22 @@ int  main(void)
 	InitializeCriticalSection(&queueAccess);
 	InitializeCriticalSection(&message_queueAccess);
 
-	hSemaphore = CreateSemaphore(0, 0, 1, NULL);
+	pubSubSemaphore = CreateSemaphore(0, 0, 1, NULL);
 
 	/*HANDLE ClientThreads[NUMBER_OF_CLIENTS];
 	DWORD ClientThreadsID[NUMBER_OF_CLIENTS];*/
 
 	HANDLE PublisherThreads[NUMBER_OF_CLIENTS];
-	DWORD PublisherThreadsID[NUMBER_OF_CLIENTS]; 
+	DWORD PublisherThreadsID[NUMBER_OF_CLIENTS];
 
 	HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
-	DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS]; 
-	
+	DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
+
+	HANDLE pubSubThread;
+	DWORD pubSubThreadID;
+
+	pubSubThread = CreateThread(NULL, 0, &PubSubWork, NULL, 0, &pubSubThreadID);
+
 	// Socket used for listening for new clients 
 	SOCKET listenSocket = INVALID_SOCKET;
 	// Socket used for communication with client
@@ -206,7 +228,6 @@ int  main(void)
 	}
 
 	printf("Server initialized, waiting for clients.\n");
-
 	do
 	{
 		SelectFunc(iResult, listenSocket, 'r');
@@ -221,50 +242,58 @@ int  main(void)
 			return 1;
 		}
 
-		SelectFunc(iResult, acceptedSockets[clientsCount], 'r');
-
-		iResult = recv(acceptedSockets[clientsCount], recvbuf, DEFAULT_BUFLEN, 0);
-
-		if (iResult > 0)
-		{
-			char delimiter[] = ":";
-			char *ptr = strtok(recvbuf, delimiter);
-
-			char *role = ptr;
-			ptr = strtok(NULL, delimiter);
-			char *topic = ptr;
-			ptr = strtok(NULL, delimiter);
-			char *message = ptr;
-
-			if (!strcmp(role, "s")) {
-				SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberWork, &acceptedSockets[clientsCount], 0, &SubscriberThreadsID[numberOfSubscribers]);
-				EnterCriticalSection(&queueAccess);
-				Subscribe(queue, acceptedSockets[clientsCount], topic);
-				LeaveCriticalSection(&queueAccess);
-				numberOfSubscribers++;
-				printf("Subscriber subscribed to topic: %s. \n", topic);
-			}
-
-			if (!strcmp(role, "p")) {
-
-				PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &PublisherThreadsID[numberOfPublishers]);
-				printf("Publisher connected.\n");
-				numberOfPublishers++;
-			}
-		}
-		else if (iResult == 0)
-		{
-			// connection was closed gracefully
-			printf("Connection with client closed.\n");
-			closesocket(acceptedSockets[clientsCount]);
-		}
-		else
-		{
-			// there was an error during recv
-			printf("recv failed with error: %d\n", WSAGetLastError());
-			closesocket(acceptedSockets[clientsCount]);
-		}
 		
+
+			SelectFunc(iResult, acceptedSockets[clientsCount], 'r');
+
+			iResult = recv(acceptedSockets[clientsCount], recvbuf, DEFAULT_BUFLEN, 0);
+
+			if (iResult > 0)
+			{
+				char delimiter[] = ":";
+				char *ptr = strtok(recvbuf, delimiter);
+
+				char *role = ptr;
+				ptr = strtok(NULL, delimiter);
+				char *topic = ptr;
+				ptr = strtok(NULL, delimiter);
+				char *message = ptr;
+
+				if (!strcmp(role, "s")) {
+					SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberWork, &acceptedSockets[clientsCount], 0, &SubscriberThreadsID[numberOfSubscribers]);
+					HANDLE hSem = CreateSemaphore(0, 0, 1, NULL);
+					struct node subscriber;
+					subscriber.sendTo = acceptedSockets[clientsCount];
+					subscriber.hSemaphore = hSem;
+					subscribers[numberOfSubscribers] = subscriber;
+					EnterCriticalSection(&queueAccess);
+					Subscribe(queue, acceptedSockets[clientsCount], topic);
+					LeaveCriticalSection(&queueAccess);
+					numberOfSubscribers++;
+					printf("Subscriber subscribed to topic: %s. \n", topic);
+				}
+
+				if (!strcmp(role, "p")) {
+
+					PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &PublisherThreadsID[numberOfPublishers]);
+					printf("Publisher connected.\n");
+					numberOfPublishers++;
+				}
+			}
+			else if (iResult == 0)
+			{
+				// connection was closed gracefully
+				printf("Connection with client closed.\n");
+				closesocket(acceptedSockets[clientsCount]);
+			}
+			else
+			{
+				// there was an error during recv
+				printf("recv failed with error: %d\n", WSAGetLastError());
+				closesocket(acceptedSockets[clientsCount]);
+			}
+		
+
 		clientsCount++;
 
 	} while (clientsCount < NUMBER_OF_CLIENTS);
@@ -280,6 +309,7 @@ int  main(void)
 		if (SubscriberThreads[i])
 			WaitForSingleObject(SubscriberThreads[i], INFINITE);
 	}
+
 
 	printf("Server shutting down.");
 

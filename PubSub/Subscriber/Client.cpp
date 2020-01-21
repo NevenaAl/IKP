@@ -96,25 +96,19 @@ int __cdecl main(int argc, char **argv)
 	
 	//printf("Bytes Sent: %ld\n", iResult);
 
-	
+	while (true) {
 		SelectFunc(iResult, connectSocket, 'r');
 
 		iResult = recv(connectSocket, recvbuf, sizeof(topic_message), 0);
 		topic_message* structrecv = (topic_message*)malloc(sizeof(topic_message));
 		topic_message msg = *(topic_message*)recvbuf;
 
-		//memcpy(structrecv->message, msg.message, sizeof(msg.message));
-		//memcpy(structrecv->topic, msg.topic, sizeof(msg.topic));
-		
 		strcpy(structrecv->message, msg.message);
 		strcpy(structrecv->topic, msg.topic);
 
-		/*char* messageReceived = (char*)malloc(bytesExpected);
-		iResult = recv(connectSocket, messageReceived, bytesExpected, 0);*/
-
 		if (iResult > 0)
 		{
-			printf("New message: %s on topic: %s", structrecv->message, structrecv->topic);
+			printf("\nNew message: %s on topic: %s\n", structrecv->message, structrecv->topic);
 		}
 		else if (iResult == 0)
 		{
@@ -128,7 +122,7 @@ int __cdecl main(int argc, char **argv)
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(connectSocket);
 		}
-
+	}
 
 	char ch = _getch();
 
