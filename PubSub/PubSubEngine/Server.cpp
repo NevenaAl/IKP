@@ -12,6 +12,129 @@ struct MessageQueue* message_queue = CreateMessageQueue(1000);
 topic_message current;
 struct node subscribers[20];
 
+struct ThreadArgument {
+	SOCKET socket;
+	int numberOfSubs;
+};
+
+HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
+DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
+
+DWORD WINAPI SubscriberWork(LPVOID lpParam)
+{
+	int iResult = 0;
+	SOCKET sendSocket = *(SOCKET*)lpParam;
+	while (true) {
+		for (int i = 0; i < (sizeof(subscribers) / sizeof(node)); i++)
+		{
+			if (sendSocket == subscribers[i].sendTo) {
+				WaitForSingleObject(subscribers[i].hSemaphore, INFINITE);
+				break;
+			}
+		}
+		
+		SelectFunction(*(SOCKET*)lpParam, 'w');
+		iResult = send(*(SOCKET*)lpParam, (char*)&current, sizeof(topic_message), 0);
+		if (iResult == SOCKET_ERROR)
+		{
+			printf("send failed with error: %d\n", WSAGetLastError());
+			closesocket(sendSocket);
+			WSACleanup();
+			return 1;
+		}
+		//SendFunction(*(SOCKET*)lpParam, (char*)&current, sizeof(topic_message));
+
+		//printf("Bytes Sentttt: %ld\n", iResult);
+	}
+	return 1;
+}
+
+DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
+	char recvbuf[DEFAULT_BUFLEN];
+	ThreadArgument argumentStructure = *(ThreadArgument*)lpParam;
+	
+	SelectFunction(argumentStructure.socket, 'r');
+
+	int iResult = recv(argumentStructure.socket, recvbuf, DEFAULT_BUFLEN, 0);
+	if (iResult > 0)
+	{
+		char delimiter[] = ":";
+		char *ptr = strtok(recvbuf, delimiter);
+
+		char *role = ptr;
+		ptr = strtok(NULL, delimiter);
+		char *topic = ptr;
+		ptr = strtok(NULL, delimiter);
+		if (!strcmp(topic, "shutDown")) {
+			SubscriberShutDown(queue, argumentStructure.socket);
+		}
+		HANDLE hSem = CreateSemaphore(0, 0, 1, NULL);
+
+		struct node subscriber;
+		subscriber.sendTo = argumentStructure.socket;
+		subscriber.hSemaphore = hSem;
+		subscribers[argumentStructure.numberOfSubs] = subscriber;
+
+		SubscriberThreads[argumentStructure.numberOfSubs] = CreateThread(NULL, 0, &SubscriberWork, &argumentStructure.socket, 0, &SubscriberThreadsID[argumentStructure.numberOfSubs]);
+
+		EnterCriticalSection(&queueAccess);
+		Subscribe(queue, argumentStructure.socket, topic);
+		LeaveCriticalSection(&queueAccess);
+		//numberOfSubscribers++;
+		printf("Subscriber %d subscribed to topic: %s. \n",argumentStructure.numberOfSubs, topic);
+		}
+		else if (iResult == 0)
+		{
+			printf("Connection with client closed.\n");
+			closesocket(argumentStructure.socket);
+		}
+		else
+		{
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(argumentStructure.socket);
+
+		}
+	while (true) {
+		SelectFunction(argumentStructure.socket, 'r');
+
+		int iResult = recv(argumentStructure.socket, recvbuf, DEFAULT_BUFLEN, 0);
+		if (iResult > 0)
+		{
+			char delimiter[] = ":";
+			char *ptr = strtok(recvbuf, delimiter);
+
+			char *role = ptr;
+			ptr = strtok(NULL, delimiter);
+			char *topic = ptr;
+			ptr = strtok(NULL, delimiter);
+			if (!strcmp(topic, "shutDown")) {
+				SubscriberShutDown(queue, argumentStructure.socket);
+			}
+			
+			EnterCriticalSection(&queueAccess);
+			Subscribe(queue, argumentStructure.socket, topic);
+			LeaveCriticalSection(&queueAccess);
+			//numberOfSubscribers++;
+			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.numberOfSubs, topic);
+		}
+		else if (iResult == 0)
+		{
+			// connection was closed gracefully
+			printf("Connection with client closed.\n");
+			closesocket(argumentStructure.socket);
+			break;
+		}
+		else
+		{
+			// there was an error during recv
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(argumentStructure.socket);
+			break;
+
+		}
+	}
+	return 1;
+}
 DWORD WINAPI PubSubWork(LPVOID lpParam) {
 	//u ovom threadu send pa subscirber klijentu kad publisher nesto stavi u message queue
 	//return 0;
@@ -58,9 +181,10 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 	SOCKET recvSocket = *(SOCKET*)lpParam;
 
 	while (true) {
-		SelectFunc(iResult, recvSocket, 'r');
+		SelectFunction(recvSocket, 'r');
 
 		iResult = recv(recvSocket, recvbuf, DEFAULT_BUFLEN, 0);
+		//ReceiveFunction(recvSocket, recvbuf);
 
 		char delimiter[] = ":";
 		char *ptr = strtok(recvbuf, delimiter);
@@ -81,36 +205,7 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 	}
 	return 1;
 }
-DWORD WINAPI SubscriberWork(LPVOID lpParam)
-{
-	int iResult = 0;
-	SOCKET sendSocket = *(SOCKET*)lpParam;
-	//HANDLE mySem = nullptr;
-	while (true) {
-		for (int i = 0; i < (sizeof(subscribers)/sizeof(node)); i++)
-		{
-			if (sendSocket == subscribers[i].sendTo) {
-				WaitForSingleObject(subscribers[i].hSemaphore, INFINITE);
-				break;
-			}
-		}
-		//WaitForSingleObject(mySem, INFINITE);
 
-		SelectFunc(iResult, *(SOCKET*)lpParam, 'w');
-		iResult = send(*(SOCKET*)lpParam, (char*)&current, sizeof(topic_message), 0);
-		if (iResult == SOCKET_ERROR)
-		{
-			printf("send failed with error: %d\n", WSAGetLastError());
-			closesocket(sendSocket);
-			WSACleanup();
-			return 1;
-		}
-
-		printf("Bytes Sentttt: %ld\n", iResult);
-	}
-	return 1;
-}
-	
 
 int  main(void)
 {
@@ -135,8 +230,7 @@ int  main(void)
 	HANDLE PublisherThreads[NUMBER_OF_CLIENTS];
 	DWORD PublisherThreadsID[NUMBER_OF_CLIENTS];
 
-	HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
-	DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
+	
 
 	HANDLE pubSubThread;
 	DWORD pubSubThreadID;
@@ -230,7 +324,7 @@ int  main(void)
 	printf("Server initialized, waiting for clients.\n");
 	do
 	{
-		SelectFunc(iResult, listenSocket, 'r');
+		SelectFunction(listenSocket, 'r');
 
 		acceptedSockets[clientsCount] = accept(listenSocket, NULL, NULL);
 
@@ -242,11 +336,11 @@ int  main(void)
 			return 1;
 		}
 
-		
 
-			SelectFunc(iResult, acceptedSockets[clientsCount], 'r');
+			SelectFunction(acceptedSockets[clientsCount], 'r');
 
 			iResult = recv(acceptedSockets[clientsCount], recvbuf, DEFAULT_BUFLEN, 0);
+		   //ReceiveFunction(acceptedSockets[clientsCount], recvbuf);
 
 			if (iResult > 0)
 			{
@@ -255,28 +349,24 @@ int  main(void)
 
 				char *role = ptr;
 				ptr = strtok(NULL, delimiter);
-				char *topic = ptr;
-				ptr = strtok(NULL, delimiter);
-				char *message = ptr;
+				//char *topic = ptr;
+				//ptr = strtok(NULL, delimiter);
+				//char *message = ptr;
 
 				if (!strcmp(role, "s")) {
-					SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberWork, &acceptedSockets[clientsCount], 0, &SubscriberThreadsID[numberOfSubscribers]);
-					HANDLE hSem = CreateSemaphore(0, 0, 1, NULL);
-					struct node subscriber;
-					subscriber.sendTo = acceptedSockets[clientsCount];
-					subscriber.hSemaphore = hSem;
-					subscribers[numberOfSubscribers] = subscriber;
-					EnterCriticalSection(&queueAccess);
-					Subscribe(queue, acceptedSockets[clientsCount], topic);
-					LeaveCriticalSection(&queueAccess);
+					ThreadArgument argumentStructure;
+					argumentStructure.numberOfSubs = numberOfSubscribers;
+					argumentStructure.socket = acceptedSockets[clientsCount];
+					SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
+					printf("Subscriber %d connected.\n", numberOfSubscribers);
 					numberOfSubscribers++;
-					printf("Subscriber subscribed to topic: %s. \n", topic);
+
 				}
 
 				if (!strcmp(role, "p")) {
 
 					PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &PublisherThreadsID[numberOfPublishers]);
-					printf("Publisher connected.\n");
+					printf("Publisher %d connected.\n",numberOfPublishers);
 					numberOfPublishers++;
 				}
 			}

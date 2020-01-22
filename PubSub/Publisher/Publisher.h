@@ -16,9 +16,51 @@
 
 bool InitializeWindowsSockets();
 void EnterAndGenerateMessage(char* publish_message, char* message);
-void SelectFunc(int, SOCKET, char);
+void SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInput(char input, char* message);
+void SendFunction(SOCKET,char*,int);
+char* GenerateMessage(char* message, int len);
+
+char* GenerateMessage(char* message, int len) {
+
+	char* messageToSend = (char*)malloc(len + sizeof(int));
+	int* headerPointer = (int*)messageToSend;
+	*headerPointer = len;
+	++headerPointer;
+	char* messageValue = (char*)headerPointer;
+
+	memcpy(messageValue, message, len);
+
+	return messageToSend;
+}
+
+
+void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
+
+	SelectFunction(connectSocket,'w');
+	int iResult = send(connectSocket, message, messageSize, 0);
+
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("send failed with error: %d\n", WSAGetLastError());
+		closesocket(connectSocket);
+		WSACleanup();
+		return;
+	}
+	else {
+
+		int cnt = iResult;
+		while (cnt < messageSize) {
+
+			SelectFunction(connectSocket,'w');
+			iResult = send(connectSocket, message + cnt, messageSize - cnt, 0);
+			cnt += iResult;
+		}
+	}
+
+	//printf("Bytes Sent: %ld\n", iResult);
+}
 
 void EnterAndGenerateMessage(char* publish_message, char* message)
 {
@@ -40,7 +82,8 @@ bool InitializeWindowsSockets()
 	}
 	return true;
 }
-void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
+void SelectFunction(SOCKET listenSocket, char rw) {
+	int iResult = 0;
 	do {
 		FD_SET set;
 		timeval timeVal;

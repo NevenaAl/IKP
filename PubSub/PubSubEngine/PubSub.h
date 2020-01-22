@@ -14,9 +14,118 @@
 #define SAFE_DELETE_HANDLE(h) {if(h)CloseHandle(h);}
 
 bool InitializeWindowsSockets();
-void SelectFunc(int, SOCKET, char);
+void SelectFunction(SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
 void Publish(struct MessageQueue*, char*, char*);
+void SubscriberShutDown(Queue*, SOCKET);
+void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
+void SendFunction(SOCKET connectSocket, char* message, int messageSize);
+char* GenerateMessage(char* message, int len);
+
+char* GenerateMessage(char* message, int len) {
+
+	char* messageToSend = (char*)malloc(len + sizeof(int));
+	int* headerPointer = (int*)messageToSend;
+	*headerPointer = len;
+	++headerPointer;
+	char* messageValue = (char*)headerPointer;
+
+	memcpy(messageValue, message, len);
+
+	return messageToSend;
+}
+
+
+void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
+
+	SelectFunction(connectSocket, 'w');
+	int iResult = send(connectSocket, message, messageSize, 0);
+
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("send failed with error: %d\n", WSAGetLastError());
+		closesocket(connectSocket);
+		WSACleanup();
+		return;
+	}
+	else {
+
+		int cnt = iResult;
+		while (cnt < messageSize) {
+
+			SelectFunction(connectSocket, 'w');
+			iResult = send(connectSocket, message + cnt, messageSize - cnt, 0);
+			cnt += iResult;
+		}
+	}
+
+	//printf("Bytes Sent: %ld\n", iResult);
+}
+
+
+void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
+
+	int iResult;
+
+	do {
+
+		// Receive data until the client shuts down the connection
+		SelectFunction(acceptedSocket, 'r');
+		iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
+
+		if (iResult > 0)
+		{
+			int bytesExpected = *((int*)recvbuf);
+			printf("Size of message is : %d\n", bytesExpected);
+
+			char* myBuffer = (char*)(malloc(sizeof(bytesExpected))); // alociranje memorije za poruku
+
+			int cnt = 0;
+
+			while (cnt < bytesExpected) {
+
+				SelectFunction(acceptedSocket, 'r');
+				iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
+
+				printf("Message received from client: %s.\n", myBuffer);
+
+				cnt += iResult;
+			}
+
+		}
+		else if (iResult == 0)
+		{
+			// connection was closed gracefully
+			printf("Connection with client closed.\n");
+			closesocket(acceptedSocket);
+		}
+		else
+		{
+			// there was an error during recv
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(acceptedSocket);
+		}
+
+
+	} while (iResult > 0);
+
+}
+
+
+void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket) {
+	for (int i = 0; i < queue->size; i++)
+	{
+		for (int j = 0; j < queue->array[i].size; j++)
+		{
+			if (queue->array[i].subs_array[j] == acceptedSocket) {
+				int size = queue->array[i].size;
+				queue->array[i].subs_array[j] = queue->array[i].subs_array[size];
+				queue->array[i].size--;
+			}
+		}
+
+	}
+}
 
 void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 	for (int i = 0; i < queue->size; i++) {
@@ -38,7 +147,8 @@ void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
 
 	printf("\nPublisher published message: %s to topic: %s\n", item.message, item.topic);
 }
-void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
+void SelectFunction(SOCKET listenSocket, char rw) {
+	int iResult = 0;
 	do {
 		FD_SET set;
 		timeval timeVal;

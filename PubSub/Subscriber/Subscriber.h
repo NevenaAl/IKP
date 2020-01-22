@@ -8,14 +8,107 @@
 #include <stdio.h>
 #include <conio.h>
 
+
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT 27016
 #define SERVER_SLEEP_TIME 50
 
+
 bool InitializeWindowsSockets();
-void SelectFunc(int, SOCKET, char);
+void SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInputAndGenerateMessage(char input, char* message);
+void SendFunction(SOCKET, char*, int);
+void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
+char* GenerateMessage(char* message, int len);
+
+char* GenerateMessage(char* message, int len) {
+
+	char* messageToSend = (char*)malloc(len + sizeof(int));
+	int* headerPointer = (int*)messageToSend;
+	*headerPointer = len;
+	++headerPointer;
+	char* messageValue = (char*)headerPointer;
+
+	memcpy(messageValue, message, len);
+
+	return messageToSend;
+}
+
+void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
+
+	int iResult;
+
+	do {
+
+		// Receive data until the client shuts down the connection
+		SelectFunction(acceptedSocket,'r');
+		iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
+
+		if (iResult > 0)
+		{
+			int bytesExpected = *((int*)recvbuf);
+			printf("Size of message is : %d\n", bytesExpected);
+
+			char* myBuffer = (char*)(malloc(sizeof(bytesExpected))); // alociranje memorije za poruku
+
+			int cnt = 0;
+
+			while (cnt < bytesExpected) {
+
+				SelectFunction(acceptedSocket,'r');
+				iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
+
+				printf("Message received from client: %s.\n", myBuffer);
+
+				cnt += iResult;
+			}
+
+		}
+		else if (iResult == 0)
+		{
+			// connection was closed gracefully
+			printf("Connection with client closed.\n");
+			closesocket(acceptedSocket);
+		}
+		else
+		{
+			// there was an error during recv
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(acceptedSocket);
+		}
+
+
+	} while (iResult > 0);
+
+}
+
+void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
+
+	SelectFunction(connectSocket, 'w');
+	int iResult = send(connectSocket, message, messageSize, 0);
+
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("send failed with error: %d\n", WSAGetLastError());
+		closesocket(connectSocket);
+		WSACleanup();
+		return;
+	}
+	else {
+
+		int cnt = iResult;
+		while (cnt < messageSize) {
+
+			SelectFunction(connectSocket, 'w');
+			iResult = send(connectSocket, message + cnt, messageSize - cnt, 0);
+			cnt += iResult;
+		}
+	}
+
+	//printf("Bytes Sent: %ld\n", iResult);
+}
+
 
 bool InitializeWindowsSockets()
 {
@@ -28,7 +121,8 @@ bool InitializeWindowsSockets()
 	}
 	return true;
 }
-void SelectFunc(int iResult, SOCKET listenSocket, char rw) {
+void SelectFunction(SOCKET listenSocket, char rw) {
+	int iResult = 0;
 	do {
 		FD_SET set;
 		timeval timeVal;

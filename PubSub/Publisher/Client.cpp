@@ -42,7 +42,7 @@ int __cdecl main(int argc, char **argv)
 
 
 	char connect[] = "p:Connect";
-	SelectFunc(iResult, connectSocket, 'w');
+	SelectFunction(connectSocket, 'w');
 	iResult = send(connectSocket, (char*)(&connect), sizeof(connect), 0);
 	if (iResult == SOCKET_ERROR)
 	{
@@ -52,6 +52,7 @@ int __cdecl main(int argc, char **argv)
 		return 1;
 	}
 	//printf("Bytes Sent: %ld\n", iResult);
+	//SendFunction(connectSocket, (char*)&connect, sizeof(connect));
 
 	//PUBLISHER WHILE
 	while (true) {
@@ -69,7 +70,7 @@ int __cdecl main(int argc, char **argv)
 
 			EnterAndGenerateMessage(publish_message, message);
 
-			SelectFunc(iResult, connectSocket, 'w');
+			SelectFunction(connectSocket, 'w');
 			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
 			if (iResult == SOCKET_ERROR)
 			{
@@ -78,6 +79,8 @@ int __cdecl main(int argc, char **argv)
 				WSACleanup();
 				return 1;
 			}
+			//char* messageWithHeader = GenerateMessage((char*)&message, strlen(message)+1);
+			//SendFunction(connectSocket, messageWithHeader, strlen(message) + 1 +sizeof(int));
 
 			//printf("Bytes Sent: %ld\n", iResult);
 		}

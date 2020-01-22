@@ -7,12 +7,86 @@ struct topic_message {
 
 // Initializes WinSock2 library
 // Returns true if succeeded, false otherwise.
+DWORD WINAPI SubscriberSend(LPVOID lpParam) {
+	int iResult = 0;
+	SOCKET connectSocket = *(SOCKET*)lpParam;
+	while (true) {
 
+		PrintMenu();
+
+		char c = _getch();
+		//char c = getchar();
+
+		SelectFunction(connectSocket, 'w');
+
+		char message[20];
+
+		if (c == '1' || c == '2' || c == '3' || c == '4' || c == '5') {
+
+			ProcessInputAndGenerateMessage(c, message);
+
+			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
+			if (iResult == SOCKET_ERROR)
+			{
+				printf("send failed with error: %d\n", WSAGetLastError());
+				closesocket(connectSocket);
+				WSACleanup();
+				return 1;
+			}
+			//SendFunction(connectSocket, (char*)(&message), sizeof(message));
+
+			printf("Bytes Sent: %ld\n", iResult);
+			//break;
+		}
+		else if (c == 'x' || c == 'X') {
+			char shutDownMessage[20] = "s:shutDown";
+			SendFunction(connectSocket, shutDownMessage, sizeof(shutDownMessage));
+			closesocket(connectSocket);
+			break;
+		}
+		else {
+			printf("Invalid input.\n");
+			continue;
+		}
+	}
+}
+DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
+	int iResult = 0;
+	SOCKET connectSocket = *(SOCKET*)lpParam;
+	char recvbuf[DEFAULT_BUFLEN];
+	while (true) {
+	SelectFunction(connectSocket, 'r');
+
+	iResult = recv(connectSocket, recvbuf, sizeof(topic_message), 0);
+	topic_message* structrecv = (topic_message*)malloc(sizeof(topic_message));
+	topic_message msg = *(topic_message*)recvbuf;
+
+	strcpy(structrecv->message, msg.message);
+	strcpy(structrecv->topic, msg.topic);
+
+	if (iResult > 0)
+	{
+		printf("\nNew message: %s on topic: %s\n", structrecv->message, structrecv->topic);
+	}
+	else if (iResult == 0)
+	{
+		// connection was closed gracefully
+		printf("Connection with server closed.\n");
+		closesocket(connectSocket);
+	}
+	else
+	{
+		// there was an error during recv
+		printf("recv failed with error: %d\n", WSAGetLastError());
+		closesocket(connectSocket);
+	}
+   }
+}
 int __cdecl main(int argc, char **argv)
 {
 	// socket used to communicate with server
 	SOCKET connectSocket = INVALID_SOCKET;
-	char recvbuf[DEFAULT_BUFLEN];
+	
 	// variable used to store function return value
 	int iResult;
 
@@ -56,75 +130,28 @@ int __cdecl main(int argc, char **argv)
 		printf("ioctlsocket failed with error: %ld\n", WSAGetLastError());
 		return 1;
 	}
+	HANDLE SubscriberSendThread,SubscriberRecvThread;
+	DWORD SubscriberSendThreadId, SubscriberRecvThreadId;
+
+	SelectFunction(connectSocket, 'w');
+
+	char message[20]= "s:connect";
+	iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("send failed with error: %d\n", WSAGetLastError());
+		closesocket(connectSocket);
+		WSACleanup();
+		return 1;
+	}
+
+	SubscriberSendThread = CreateThread(NULL, 0, &SubscriberSend, &connectSocket, 0, &SubscriberSendThreadId);
+	SubscriberRecvThread = CreateThread(NULL, 0, &SubscriberReceive, &connectSocket, 0, &SubscriberRecvThreadId);
+
 
 	while (true) {
 
-		PrintMenu();
-		
-		char c = _getch();
-
-		SelectFunc(iResult, connectSocket, 'w');
-
-		char message[20];
-
-		if (c == '1' || c == '2' || c == '3' || c == '4' || c == '5') {
-
-			ProcessInputAndGenerateMessage(c, message);
-
-			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
-			if (iResult == SOCKET_ERROR)
-			{
-				printf("send failed with error: %d\n", WSAGetLastError());
-				closesocket(connectSocket);
-				WSACleanup();
-				return 1;
-			}
-
-			printf("Bytes Sent: %ld\n", iResult);
-			break;
-		}
-		else if (c == 'x' || c == 'X') {
-			closesocket(connectSocket);
-			break;
-		}
-		else {
-			printf("Invalid input.\n");
-			continue;
-		}
-		// Send an prepared message with null terminator included
-	}
-	
-	//printf("Bytes Sent: %ld\n", iResult);
-
-	while (true) {
-		SelectFunc(iResult, connectSocket, 'r');
-
-		iResult = recv(connectSocket, recvbuf, sizeof(topic_message), 0);
-		topic_message* structrecv = (topic_message*)malloc(sizeof(topic_message));
-		topic_message msg = *(topic_message*)recvbuf;
-
-		strcpy(structrecv->message, msg.message);
-		strcpy(structrecv->topic, msg.topic);
-
-		if (iResult > 0)
-		{
-			printf("\nNew message: %s on topic: %s\n", structrecv->message, structrecv->topic);
-		}
-		else if (iResult == 0)
-		{
-			// connection was closed gracefully
-			printf("Connection with server closed.\n");
-			closesocket(connectSocket);
-		}
-		else
-		{
-			// there was an error during recv
-			printf("recv failed with error: %d\n", WSAGetLastError());
-			closesocket(connectSocket);
-		}
-	}
-
-	char ch = _getch();
+   }
 
 	// cleanup
 	closesocket(connectSocket);
