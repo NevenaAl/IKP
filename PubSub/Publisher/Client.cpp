@@ -1,5 +1,7 @@
 #include "Publisher.h"
 
+int possible = 1;
+
 int __cdecl main(int argc, char **argv)
 {
 	SOCKET connectSocket = INVALID_SOCKET;
@@ -55,7 +57,7 @@ int __cdecl main(int argc, char **argv)
 	//SendFunction(connectSocket, (char*)&connect, sizeof(connect));
 
 	//PUBLISHER WHILE
-	while (true) {
+	while (possible) {
 
 		PrintMenu();
 		char c = _getch();
@@ -85,6 +87,9 @@ int __cdecl main(int argc, char **argv)
 			//printf("Bytes Sent: %ld\n", iResult);
 		}
 		else if (c == 'x' || c == 'X') {
+			char shutDownMessage[20] = "p:shutDown";
+			SendFunction(connectSocket, shutDownMessage, sizeof(shutDownMessage));
+			possible = 0;
 			closesocket(connectSocket);
 			break;
 		}

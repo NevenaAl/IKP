@@ -1,5 +1,4 @@
 #include "PubSub.h"
-#include "Dictionary.h"
 
 CRITICAL_SECTION queueAccess;
 CRITICAL_SECTION message_queueAccess;
@@ -66,7 +65,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		char *topic = ptr;
 		ptr = strtok(NULL, delimiter);
 		if (!strcmp(topic, "shutDown")) {
-			SubscriberShutDown(queue, argumentStructure.socket);
+			SubscriberShutDown(queue, argumentStructure.socket, subscribers);
 		}
 		HANDLE hSem = CreateSemaphore(0, 0, 1, NULL);
 
@@ -108,7 +107,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			char *topic = ptr;
 			ptr = strtok(NULL, delimiter);
 			if (!strcmp(topic, "shutDown")) {
-				SubscriberShutDown(queue, argumentStructure.socket);
+				SubscriberShutDown(queue, argumentStructure.socket, subscribers);
 			}
 			
 			EnterCriticalSection(&queueAccess);

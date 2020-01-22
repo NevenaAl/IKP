@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "Queue.h"
+#include "Dictionary.h"
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27016"
@@ -17,7 +18,7 @@ bool InitializeWindowsSockets();
 void SelectFunction(SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
 void Publish(struct MessageQueue*, char*, char*);
-void SubscriberShutDown(Queue*, SOCKET);
+void SubscriberShutDown(Queue*, SOCKET, struct node subscribers[]);
 void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 void SendFunction(SOCKET connectSocket, char* message, int messageSize);
 char* GenerateMessage(char* message, int len);
@@ -112,18 +113,35 @@ void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 }
 
 
-void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket) {
+void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct node subscribers[]) {
 	for (int i = 0; i < queue->size; i++)
 	{
 		for (int j = 0; j < queue->array[i].size; j++)
 		{
 			if (queue->array[i].subs_array[j] == acceptedSocket) {
 				int size = queue->array[i].size;
-				queue->array[i].subs_array[j] = queue->array[i].subs_array[size];
-				queue->array[i].size--;
+				SOCKET temp = queue->array[i].subs_array[size];
+				if (temp != 3435973836) {
+					queue->array[i].subs_array[size] = 3435973836;
+					queue->array[i].subs_array[j] = temp;
+					queue->array[i].size--;
+				}
+				else {
+					queue->array[i].subs_array[j] = 3435973836;
+					queue->array[i].size--;
+				}
+				
 			}
 		}
 
+	}
+
+	for (int i = 0; i < sizeof(subscribers)/sizeof(struct node); i++)
+	{
+		if (subscribers[i].sendTo == acceptedSocket) {
+			subscribers[i].sendTo = 0;
+			subscribers[i].hSemaphore = 0;
+		}
 	}
 }
 
