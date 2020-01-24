@@ -1,5 +1,7 @@
 #include "Subscriber.h"
 
+#define SAFE_DELETE_HANDLE(h) {if(h)CloseHandle(h);}
+
 struct topic_message {
 	char topic[15];
 	char message[250];
@@ -19,9 +21,6 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 		PrintMenu();
 
 		char c = _getch();
-		//char c = getchar();
-
-		SelectFunction(connectSocket, 'w');
 
 		char message[20];
 
@@ -29,22 +28,21 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 
 			ProcessInputAndGenerateMessage(c, message);
 
-			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
-			if (iResult == SOCKET_ERROR)
-			{
-				printf("send failed with error: %d\n", WSAGetLastError());
-				closesocket(connectSocket);
-				WSACleanup();
-				return 1;
-			}
-			//SendFunction(connectSocket, (char*)(&message), sizeof(message));
+			int messageDataSize = strlen(message) + 1;
+			int messageSize = messageDataSize + sizeof(int);
 
-			printf("Bytes Sent: %ld\n", iResult);
-			//break;
+			MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
+			SendFunction(connectSocket, (char*)messageStruct, messageSize);
+
 		}
 		else if (c == 'x' || c == 'X') {
 			char shutDownMessage[20] = "s:shutDown";
-			SendFunction(connectSocket, shutDownMessage, sizeof(shutDownMessage));
+			int messageDataSize = strlen(shutDownMessage) + 1;
+			int messageSize = messageDataSize + sizeof(int);
+
+			MessageStruct* messageStruct = GenerateMessageStruct(shutDownMessage, messageDataSize);
+			SendFunction(connectSocket, (char*)messageStruct, messageSize);
+
 			sendPossible = 0;
 			recvPossible = 0;
 			closesocket(connectSocket);
@@ -63,30 +61,30 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	char recvbuf[DEFAULT_BUFLEN];
 	while (recvPossible) 
 	{
-		SelectFunction(connectSocket, 'r');
-
-		iResult = recv(connectSocket, recvbuf, sizeof(topic_message), 0);
-		topic_message* structrecv = (topic_message*)malloc(sizeof(topic_message));
-		topic_message msg = *(topic_message*)recvbuf;
-
-		strcpy(structrecv->message, msg.message);
-		strcpy(structrecv->topic, msg.topic);
-
-		if (iResult > 0)
+		memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
+		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
 		{
-			printf("\nNew message: %s on topic: %s\n", structrecv->message, structrecv->topic);
+		  topic_message* structrecv = (topic_message*)malloc(sizeof(topic_message));
+		  topic_message msg = *(topic_message*)recvbuf;
+
+		  strcpy(structrecv->message, msg.message);
+		  strcpy(structrecv->topic, msg.topic);
+
+		  printf("\nNew message: %s on topic: %s\n", structrecv->message, structrecv->topic);
 		}
-		else if (iResult == 0)
+		else if (!strcmp(recvbuf, "ErrorC"))
 		{
 		// connection was closed gracefully
 			printf("Connection with server closed.\n");
 			closesocket(connectSocket);
+			break;
 		}
-		else
+		else if (!strcmp(recvbuf, "ErrorR"))
 		{
 			// there was an error during recv
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(connectSocket);
+			break;
 		}
 	}
 	return 1;
@@ -101,8 +99,6 @@ int __cdecl main(int argc, char **argv)
 
 	if (InitializeWindowsSockets() == false)
 	{
-		// we won't log anything since it will be logged
-		// by InitializeWindowsSockets() function
 		return 1;
 	}
 
@@ -142,17 +138,12 @@ int __cdecl main(int argc, char **argv)
 	HANDLE SubscriberSendThread,SubscriberRecvThread;
 	DWORD SubscriberSendThreadId, SubscriberRecvThreadId;
 
-	SelectFunction(connectSocket, 'w');
+	char message[20] = "s:connect";
+	int messageDataSize = strlen(message) + 1;
+	int messageSize = messageDataSize + sizeof(int);
 
-	char message[20]= "s:connect";
-	iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
-	if (iResult == SOCKET_ERROR)
-	{
-		printf("send failed with error: %d\n", WSAGetLastError());
-		closesocket(connectSocket);
-		WSACleanup();
-		return 1;
-	}
+	MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
+	SendFunction(connectSocket, (char*)messageStruct, messageSize);
 
 	SubscriberSendThread = CreateThread(NULL, 0, &SubscriberSend, &connectSocket, 0, &SubscriberSendThreadId);
 	SubscriberRecvThread = CreateThread(NULL, 0, &SubscriberReceive, &connectSocket, 0, &SubscriberRecvThreadId);
@@ -162,6 +153,13 @@ int __cdecl main(int argc, char **argv)
 
 	}
 
+	if (SubscriberSendThread)
+		WaitForSingleObject(SubscriberSendThread, INFINITE);
+	if (SubscriberRecvThread)
+		WaitForSingleObject(SubscriberRecvThread, INFINITE);
+
+	SAFE_DELETE_HANDLE(SubscriberSendThread);
+	SAFE_DELETE_HANDLE(SubscriberRecvThread);
 	// cleanup
 	closesocket(connectSocket);
 	WSACleanup();

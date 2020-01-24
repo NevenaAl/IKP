@@ -13,77 +13,75 @@
 #define DEFAULT_PORT 27016
 #define SERVER_SLEEP_TIME 50
 
+struct MessageStruct
+{
+	int header;
+	char message[DEFAULT_BUFLEN - 4];
 
+}typedef MessageStruct;
 
 bool InitializeWindowsSockets();
 void SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInputAndGenerateMessage(char input, char* message);
 void SendFunction(SOCKET, char*, int);
-void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
-char* GenerateMessage(char* message, int len);
+char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
+MessageStruct* GenerateMessageStruct(char* message, int len);
 
-char* GenerateMessage(char* message, int len) {
+MessageStruct* GenerateMessageStruct(char* message, int len) {
 
-	char* messageToSend = (char*)malloc(len + sizeof(int));
-	int* headerPointer = (int*)messageToSend;
-	*headerPointer = len;
-	++headerPointer;
-	char* messageValue = (char*)headerPointer;
+	MessageStruct* messageStruct = (MessageStruct *)(malloc(sizeof(MessageStruct)));
 
-	memcpy(messageValue, message, len);
+	messageStruct->header = len;
+	memcpy(messageStruct->message, message, len);
 
-	return messageToSend;
+	return messageStruct;
+
 }
 
-void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
+char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
 
-	do {
+	SelectFunction(acceptedSocket, 'r');
+	iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
 
-		// Receive data until the client shuts down the connection
-		SelectFunction(acceptedSocket,'r');
-		iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
+	if (iResult > 0)
+	{
+		int bytesExpected = *((int*)recvbuf);
+		//printf("Size of message is : %d\n", bytesExpected);
 
-		if (iResult > 0)
-		{
-			int bytesExpected = *((int*)recvbuf);
-			printf("Size of message is : %d\n", bytesExpected);
+		char* myBuffer = (char*)(malloc(sizeof(bytesExpected))); // alociranje memorije za poruku
 
-			char* myBuffer = (char*)(malloc(sizeof(bytesExpected))); // alociranje memorije za poruku
+		int cnt = 0;
 
-			int cnt = 0;
+		while (cnt < bytesExpected) {
 
-			while (cnt < bytesExpected) {
+			SelectFunction(acceptedSocket, 'r');
+			iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
 
-				SelectFunction(acceptedSocket,'r');
-				iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
+			//printf("Message received from client: %s.\n", myBuffer);
 
-				printf("Message received from client: %s.\n", myBuffer);
-
-				cnt += iResult;
-			}
-
+			cnt += iResult;
 		}
-		else if (iResult == 0)
-		{
-			// connection was closed gracefully
-			printf("Connection with client closed.\n");
-			closesocket(acceptedSocket);
-		}
-		else
-		{
-			// there was an error during recv
-			printf("recv failed with error: %d\n", WSAGetLastError());
-			closesocket(acceptedSocket);
-		}
-
-
-	} while (iResult > 0);
+		return myBuffer;
+	}
+	else if (iResult == 0)
+	{
+		// connection was closed gracefully
+		//printf("Connection with client closed.\n");
+		//closesocket(acceptedSocket);
+		return "ErrorC";
+	}
+	else
+	{
+		// there was an error during recv
+		//printf("recv failed with error: %d\n", WSAGetLastError());
+		//closesocket(acceptedSocket);
+		return "ErrorR";
+	}
 
 }
-
 void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
 	SelectFunction(connectSocket, 'w');
@@ -179,18 +177,23 @@ void ProcessInputAndGenerateMessage(char input, char* message) {
 	switch (input) {
 	case '1':
 		strcpy(message, "s:Sport");
+		printf("You subscribed on Sport.\n");
 		break;
 	case '2':
 		strcpy(message, "s:Fashion");
+		printf("You subscribed on Fashion.\n");
 		break;
 	case '3':
 		strcpy(message, "s:Politics");
+		printf("You subscribed on Politics.\n");
 		break;
 	case '4':
 		strcpy(message, "s:News");
+		printf("You subscribed on News.\n");
 		break;
 	case '5':
 		strcpy(message, "s:Show business");
+		printf("You subscribed on Show business.\n");
 		break;
 	default:
 		break;

@@ -44,17 +44,12 @@ int __cdecl main(int argc, char **argv)
 
 
 	char connect[] = "p:Connect";
-	SelectFunction(connectSocket, 'w');
-	iResult = send(connectSocket, (char*)(&connect), sizeof(connect), 0);
-	if (iResult == SOCKET_ERROR)
-	{
-		printf("send failed with error: %d\n", WSAGetLastError());
-		closesocket(connectSocket);
-		WSACleanup();
-		return 1;
-	}
-	//printf("Bytes Sent: %ld\n", iResult);
-	//SendFunction(connectSocket, (char*)&connect, sizeof(connect));
+
+	int messageDataSize = strlen(connect) + 1;
+	int messageSize = messageDataSize + sizeof(int);
+
+	MessageStruct* messageStruct = GenerateMessageStruct(connect, messageDataSize);
+	SendFunction(connectSocket, (char*)messageStruct, messageSize);
 
 	//PUBLISHER WHILE
 	while (possible) {
@@ -72,23 +67,20 @@ int __cdecl main(int argc, char **argv)
 
 			EnterAndGenerateMessage(publish_message, message);
 
-			SelectFunction(connectSocket, 'w');
-			iResult = send(connectSocket, (char*)(&message), sizeof(message), 0);
-			if (iResult == SOCKET_ERROR)
-			{
-				printf("send failed with error: %d\n", WSAGetLastError());
-				closesocket(connectSocket);
-				WSACleanup();
-				return 1;
-			}
-			//char* messageWithHeader = GenerateMessage((char*)&message, strlen(message)+1);
-			//SendFunction(connectSocket, messageWithHeader, strlen(message) + 1 +sizeof(int));
+			int messageDataSize = strlen(message) + 1;
+			int messageSize = messageDataSize + sizeof(int);
 
-			//printf("Bytes Sent: %ld\n", iResult);
+			MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
+			SendFunction(connectSocket, (char*)messageStruct, messageSize);
+
 		}
 		else if (c == 'x' || c == 'X') {
 			char shutDownMessage[20] = "p:shutDown";
-			SendFunction(connectSocket, shutDownMessage, sizeof(shutDownMessage));
+			int messageDataSize = strlen(shutDownMessage) + 1;
+			int messageSize = messageDataSize + sizeof(int);
+
+			MessageStruct* messageStruct = GenerateMessageStruct(shutDownMessage, messageDataSize);
+			SendFunction(connectSocket, (char*)messageStruct, messageSize);
 			possible = 0;
 			closesocket(connectSocket);
 			break;
@@ -99,10 +91,6 @@ int __cdecl main(int argc, char **argv)
 		}
 	}
 	
-
-	//printf("Bytes Sent: %ld\n", iResult);
-
-	// cleanup
 	closesocket(connectSocket);
 	WSACleanup();
 

@@ -103,7 +103,7 @@ void EnqueueMessageQueue(struct MessageQueue* queue, topic_message topic)
 	queue->rear = (queue->rear + 1) % queue->capacity;
 	queue->array[queue->rear] = topic;
 	queue->size = queue->size + 1;
-	printf("%s Enqueued to queue\n", topic.topic);
+	//printf("%s Enqueued to queue\n", topic.topic);
 }
 topic_sub Dequeue(struct Queue* queue)
 {

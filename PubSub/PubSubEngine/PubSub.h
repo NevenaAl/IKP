@@ -5,6 +5,7 @@
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <conio.h>
 #include "Queue.h"
 #include "Dictionary.h"
 
@@ -14,26 +15,32 @@
 #define NUMBER_OF_CLIENTS 40
 #define SAFE_DELETE_HANDLE(h) {if(h)CloseHandle(h);}
 
+struct MessageStruct
+{
+	int header;
+	topic_message message;
+
+}typedef MessageStruct;
+
 bool InitializeWindowsSockets();
 void SelectFunction(SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
 void Publish(struct MessageQueue*, char*, char*);
 void SubscriberShutDown(Queue*, SOCKET, struct node subscribers[]);
-void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
+char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 void SendFunction(SOCKET connectSocket, char* message, int messageSize);
-char* GenerateMessage(char* message, int len);
+MessageStruct* GenerateMessageStruct(topic_message* message, int lenMessage, int lenTopic);
 
-char* GenerateMessage(char* message, int len) {
+MessageStruct* GenerateMessageStruct(topic_message* message, int lenMessage,int lenTopic) {
 
-	char* messageToSend = (char*)malloc(len + sizeof(int));
-	int* headerPointer = (int*)messageToSend;
-	*headerPointer = len;
-	++headerPointer;
-	char* messageValue = (char*)headerPointer;
+	MessageStruct* messageStruct = (MessageStruct *)(malloc(sizeof(MessageStruct)));
 
-	memcpy(messageValue, message, len);
+	messageStruct->header = sizeof(topic_message);
+	memcpy(messageStruct->message.message, message->message, lenMessage);
+	memcpy(messageStruct->message.topic, message->topic, lenTopic);
 
-	return messageToSend;
+	return messageStruct;
+
 }
 
 
@@ -64,20 +71,17 @@ void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 }
 
 
-void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
+char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
 
-	do {
-
-		// Receive data until the client shuts down the connection
 		SelectFunction(acceptedSocket, 'r');
 		iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
 
 		if (iResult > 0)
 		{
 			int bytesExpected = *((int*)recvbuf);
-			printf("Size of message is : %d\n", bytesExpected);
+			//printf("Size of message is : %d\n", bytesExpected);
 
 			char* myBuffer = (char*)(malloc(sizeof(bytesExpected))); // alociranje memorije za poruku
 
@@ -88,28 +92,27 @@ void ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 				SelectFunction(acceptedSocket, 'r');
 				iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
 
-				printf("Message received from client: %s.\n", myBuffer);
+				//printf("Message received from client: %s.\n", myBuffer);
 
 				cnt += iResult;
 			}
-
+			return myBuffer;
 		}
 		else if (iResult == 0)
 		{
 			// connection was closed gracefully
-			printf("Connection with client closed.\n");
-			closesocket(acceptedSocket);
+			//printf("Connection with client closed.\n");
+			//closesocket(acceptedSocket);
+			return "ErrorC";
 		}
 		else
 		{
 			// there was an error during recv
-			printf("recv failed with error: %d\n", WSAGetLastError());
-			closesocket(acceptedSocket);
-		}
-
-
-	} while (iResult > 0);
-
+			//printf("recv failed with error: %d\n", WSAGetLastError());
+			//closesocket(acceptedSocket);
+			return "ErrorR";
+		}	
+		
 }
 
 

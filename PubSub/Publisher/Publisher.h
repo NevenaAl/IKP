@@ -14,27 +14,31 @@
 #define DEFAULT_PORT 27016
 #define SERVER_SLEEP_TIME 50
 
+struct MessageStruct
+{
+	int header;
+	char message[DEFAULT_BUFLEN - 4];
+
+}typedef MessageStruct;
+
 bool InitializeWindowsSockets();
 void EnterAndGenerateMessage(char* publish_message, char* message);
 void SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInput(char input, char* message);
 void SendFunction(SOCKET,char*,int);
-char* GenerateMessage(char* message, int len);
+MessageStruct* GenerateMessageStruct(char* message, int len);
 
-char* GenerateMessage(char* message, int len) {
+MessageStruct* GenerateMessageStruct(char* message, int len) {
 
-	char* messageToSend = (char*)malloc(len + sizeof(int));
-	int* headerPointer = (int*)messageToSend;
-	*headerPointer = len;
-	++headerPointer;
-	char* messageValue = (char*)headerPointer;
+	MessageStruct* messageStruct = (MessageStruct *)(malloc(sizeof(MessageStruct)));
 
-	memcpy(messageValue, message, len);
+	messageStruct->header = len;
+	memcpy(messageStruct->message, message, len);
 
-	return messageToSend;
+	return messageStruct;
+
 }
-
 
 void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
@@ -64,11 +68,14 @@ void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
 void EnterAndGenerateMessage(char* publish_message, char* message)
 {
+
 	printf("Enter message you want to publish:\n");
 	scanf("%s", publish_message);
 
 	strcat(message, ":");
 	strcat(message, publish_message);
+
+	printf("You published message: %s.\n", publish_message);
 }
 
 bool InitializeWindowsSockets()

@@ -19,6 +19,20 @@ struct ThreadArgument {
 HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
 DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
 
+//DWORD WINAPI GetChar(LPVOID lpParam)
+//{
+//	char c;
+//	do {
+//		 c = _getch();
+//		 if (c == 'x' || c == 'X') {
+//			 CleanUp();
+//			 break;
+//		 }
+//
+//	} while (true);
+//	return 1;
+//}
+
 DWORD WINAPI SubscriberWork(LPVOID lpParam)
 {
 	int iResult = 0;
@@ -32,18 +46,12 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 			}
 		}
 		
-		SelectFunction(*(SOCKET*)lpParam, 'w');
-		iResult = send(*(SOCKET*)lpParam, (char*)&current, sizeof(topic_message), 0);
-		if (iResult == SOCKET_ERROR)
-		{
-			printf("send failed with error: %d\n", WSAGetLastError());
-			closesocket(sendSocket);
-			WSACleanup();
-			return 1;
-		}
-		//SendFunction(*(SOCKET*)lpParam, (char*)&current, sizeof(topic_message));
+		int messageDataSize = sizeof(topic_message);
+		int messageSize = messageDataSize + sizeof(int);
 
-		//printf("Bytes Sentttt: %ld\n", iResult);
+		MessageStruct* messageStruct = GenerateMessageStruct(&current, strlen((char*)&current.message)+1, strlen((char*)&current.topic)+1);
+		SendFunction(sendSocket, (char*)messageStruct, messageSize);
+
 	}
 	return 1;
 }
@@ -52,10 +60,8 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	char recvbuf[DEFAULT_BUFLEN];
 	ThreadArgument argumentStructure = *(ThreadArgument*)lpParam;
 	
-	SelectFunction(argumentStructure.socket, 'r');
-
-	int iResult = recv(argumentStructure.socket, recvbuf, DEFAULT_BUFLEN, 0);
-	if (iResult > 0)
+	memcpy(recvbuf,ReceiveFunction(argumentStructure.socket, recvbuf), DEFAULT_BUFLEN);
+	if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
 	{
 		char delimiter[] = ":";
 		char *ptr = strtok(recvbuf, delimiter);
@@ -79,25 +85,23 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		EnterCriticalSection(&queueAccess);
 		Subscribe(queue, argumentStructure.socket, topic);
 		LeaveCriticalSection(&queueAccess);
-		//numberOfSubscribers++;
 		printf("Subscriber %d subscribed to topic: %s. \n",argumentStructure.numberOfSubs, topic);
 		}
-		else if (iResult == 0)
+		else if (!strcmp(recvbuf, "ErrorC"))
 		{
 			printf("Connection with client closed.\n");
 			closesocket(argumentStructure.socket);
 		}
-		else
+		else if (!strcmp(recvbuf, "ErrorR"))
 		{
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(argumentStructure.socket);
 
 		}
 	while (true) {
-		SelectFunction(argumentStructure.socket, 'r');
 
-		int iResult = recv(argumentStructure.socket, recvbuf, DEFAULT_BUFLEN, 0);
-		if (iResult > 0)
+		memcpy(recvbuf, ReceiveFunction(argumentStructure.socket, recvbuf), DEFAULT_BUFLEN);;
+		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
 		{
 			char delimiter[] = ":";
 			char *ptr = strtok(recvbuf, delimiter);
@@ -113,17 +117,16 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			EnterCriticalSection(&queueAccess);
 			Subscribe(queue, argumentStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			//numberOfSubscribers++;
 			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.numberOfSubs, topic);
 		}
-		else if (iResult == 0)
+		else if (!strcmp(recvbuf, "ErrorC"))
 		{
 			// connection was closed gracefully
 			printf("Connection with client closed.\n");
 			closesocket(argumentStructure.socket);
 			break;
 		}
-		else
+		else if (!strcmp(recvbuf, "ErrorR"))
 		{
 			// there was an error during recv
 			printf("recv failed with error: %d\n", WSAGetLastError());
@@ -145,9 +148,6 @@ DWORD WINAPI PubSubWork(LPVOID lpParam) {
 		EnterCriticalSection(&message_queueAccess);
 		current = DequeueMessageQueue(message_queue);
 		LeaveCriticalSection(&message_queueAccess);
-
-		printf("Topic: %s\n", current.topic);
-		printf("message: %s\n\n", current.message);
 
 		int numOfSockets = 0;
 		//poslati svim pretplacenim
@@ -180,26 +180,41 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 	SOCKET recvSocket = *(SOCKET*)lpParam;
 
 	while (true) {
-		SelectFunction(recvSocket, 'r');
 
-		iResult = recv(recvSocket, recvbuf, DEFAULT_BUFLEN, 0);
-		//ReceiveFunction(recvSocket, recvbuf);
+		memcpy(recvbuf, ReceiveFunction(recvSocket, recvbuf), DEFAULT_BUFLEN);
+		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
+		{
+			char delimiter[] = ":";
+			char *ptr = strtok(recvbuf, delimiter);
 
-		char delimiter[] = ":";
-		char *ptr = strtok(recvbuf, delimiter);
-
-		char *role = ptr;
-		ptr = strtok(NULL, delimiter);
-		char *topic = ptr;
-		ptr = strtok(NULL, delimiter);
-		char *message = ptr;
-
-		if (!strcmp(role, "p")) {
+			char *role = ptr;
 			ptr = strtok(NULL, delimiter);
-			EnterCriticalSection(&message_queueAccess);
-			Publish(message_queue, topic, message);
-			LeaveCriticalSection(&message_queueAccess);
-			ReleaseSemaphore(pubSubSemaphore, 1, NULL);
+			char *topic = ptr;
+			ptr = strtok(NULL, delimiter);
+			char *message = ptr;
+
+			if (!strcmp(role, "p")) {
+				ptr = strtok(NULL, delimiter);
+				EnterCriticalSection(&message_queueAccess);
+				Publish(message_queue, topic, message);
+				LeaveCriticalSection(&message_queueAccess);
+				ReleaseSemaphore(pubSubSemaphore, 1, NULL);
+			}
+		}
+		else if (!strcmp(recvbuf, "ErrorC"))
+		{
+			// connection was closed gracefully
+			printf("Connection with client closed.\n");
+			closesocket(recvSocket);
+			break;
+		}
+		else if (!strcmp(recvbuf, "ErrorR"))
+		{
+			// there was an error during recv
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(recvSocket);
+			break;
+
 		}
 	}
 	return 1;
@@ -223,18 +238,17 @@ int  main(void)
 
 	pubSubSemaphore = CreateSemaphore(0, 0, 1, NULL);
 
-	/*HANDLE ClientThreads[NUMBER_OF_CLIENTS];
-	DWORD ClientThreadsID[NUMBER_OF_CLIENTS];*/
-
 	HANDLE PublisherThreads[NUMBER_OF_CLIENTS];
 	DWORD PublisherThreadsID[NUMBER_OF_CLIENTS];
-
-	
 
 	HANDLE pubSubThread;
 	DWORD pubSubThreadID;
 
+	/*HANDLE exitThread;
+	DWORD exitThreadID;*/
+
 	pubSubThread = CreateThread(NULL, 0, &PubSubWork, NULL, 0, &pubSubThreadID);
+	//exitThread = CreateThread(NULL, 0, &GetChar, NULL, 0, &exitThreadID);
 
 	// Socket used for listening for new clients 
 	SOCKET listenSocket = INVALID_SOCKET;
@@ -321,6 +335,7 @@ int  main(void)
 	}
 
 	printf("Server initialized, waiting for clients.\n");
+	//printf("Press X if you want to close server.\n");
 	do
 	{
 		SelectFunction(listenSocket, 'r');
@@ -335,22 +350,14 @@ int  main(void)
 			return 1;
 		}
 
-
-			SelectFunction(acceptedSockets[clientsCount], 'r');
-
-			iResult = recv(acceptedSockets[clientsCount], recvbuf, DEFAULT_BUFLEN, 0);
-		   //ReceiveFunction(acceptedSockets[clientsCount], recvbuf);
-
-			if (iResult > 0)
+		    memcpy(recvbuf, ReceiveFunction(acceptedSockets[clientsCount], recvbuf), DEFAULT_BUFLEN);
+			if (strcmp(recvbuf,"ErrorC") && strcmp(recvbuf, "ErrorR"))
 			{
 				char delimiter[] = ":";
 				char *ptr = strtok(recvbuf, delimiter);
 
 				char *role = ptr;
 				ptr = strtok(NULL, delimiter);
-				//char *topic = ptr;
-				//ptr = strtok(NULL, delimiter);
-				//char *message = ptr;
 
 				if (!strcmp(role, "s")) {
 					ThreadArgument argumentStructure;
@@ -369,13 +376,13 @@ int  main(void)
 					numberOfPublishers++;
 				}
 			}
-			else if (iResult == 0)
+			else if (!strcmp(recvbuf, "ErrorC"))
 			{
 				// connection was closed gracefully
 				printf("Connection with client closed.\n");
 				closesocket(acceptedSockets[clientsCount]);
 			}
-			else
+			else if (!strcmp(recvbuf, "ErrorR"))
 			{
 				// there was an error during recv
 				printf("recv failed with error: %d\n", WSAGetLastError());
