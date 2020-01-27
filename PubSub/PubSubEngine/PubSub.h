@@ -18,11 +18,12 @@ bool serverRunning = true;
 
 int numberOfPublishers = 0;
 int numberOfSubscribers = 0;
-ThreadArgument argumentStructure;
+ThreadArgument publisherThreadArgument;
+ThreadArgument subscriberThreadArgument;
 
 int SelectFunction(SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
-void Publish(struct MessageQueue*, char*, char*);
+void Publish(struct MessageQueue*, char*, char*,int);
 void SubscriberShutDown(Queue*, SOCKET, struct Subscriber subscribers[]);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 int SendFunction(SOCKET connectSocket, char* message, int messageSize);
@@ -42,8 +43,8 @@ char Connect(SOCKET acceptedSocket) {
 
 		if (!strcmp(role, "s")) {
 			
-			argumentStructure.numberOfSubs = numberOfSubscribers;
-			argumentStructure.socket = acceptedSocket;
+			subscriberThreadArgument.ordinalNumber = numberOfSubscribers;
+			subscriberThreadArgument.socket = acceptedSocket;
 			//SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
 			printf("Subscriber %d connected.\n", numberOfSubscribers);
 			numberOfSubscribers++;
@@ -51,7 +52,8 @@ char Connect(SOCKET acceptedSocket) {
 		}
 
 		if (!strcmp(role, "p")) {
-
+			publisherThreadArgument.ordinalNumber = numberOfPublishers;
+			publisherThreadArgument.socket = acceptedSocket;
 			//PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSocket, 0, &PublisherThreadsID[numberOfPublishers]);
 			printf("Publisher %d connected.\n", numberOfPublishers);
 			numberOfPublishers++;
@@ -229,7 +231,7 @@ void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 ///<param name ="message">Published message.</param>
 ///<param name ="topic">Topic publisher has published to.</param>
 ///<returns>No return value.</returns>
-void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
+void Publish(struct MessageQueue* message_queue, char* topic, char* message,int ordinalNumber) {
 	
 	struct topic_message item;
 	memcpy(item.message, message, strlen(message)+1);
@@ -237,7 +239,7 @@ void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
 
 	EnqueueMessageQueue(message_queue, item);
 
-	printf("\nPublisher published message: %s to topic: %s\n", item.message, item.topic);
+	printf("\nPublisher %d published message: %s to topic: %s\n",ordinalNumber, item.message, item.topic);
 
 }
 

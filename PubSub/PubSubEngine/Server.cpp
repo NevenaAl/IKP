@@ -127,6 +127,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		char *topic = ptr;
 		ptr = strtok(NULL, delimiter);
 		if (!strcmp(topic, "shutDown")) {
+			printf("Subscriber %d disconnected.\n", argumentStructure.ordinalNumber);
 			SubscriberShutDown(queue, argumentStructure.socket, subscribers);
 			subscriberRunning = false;
 			return 0;
@@ -137,14 +138,14 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			struct Subscriber subscriber;
 			subscriber.sendTo = argumentStructure.socket;
 			subscriber.hSemaphore = hSem;
-			subscribers[argumentStructure.numberOfSubs] = subscriber;
+			subscribers[argumentStructure.ordinalNumber] = subscriber;
 
-			SubscriberThreads[argumentStructure.numberOfSubs] = CreateThread(NULL, 0, &SubscriberWork, &argumentStructure.socket, 0, &SubscriberThreadsID[argumentStructure.numberOfSubs]);
+			SubscriberThreads[argumentStructure.ordinalNumber] = CreateThread(NULL, 0, &SubscriberWork, &argumentStructure.socket, 0, &SubscriberThreadsID[argumentStructure.ordinalNumber]);
 
 			EnterCriticalSection(&queueAccess);
 			Subscribe(queue, argumentStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.numberOfSubs, topic);
+			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.ordinalNumber, topic);
 		}
 	}
 	else if (!strcmp(recvbuf, "ErrorS")) {
@@ -175,6 +176,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			char *topic = ptr;
 			ptr = strtok(NULL, delimiter);
 			if (!strcmp(topic, "shutDown")) {
+				printf("Subscriber %d disconnected.\n",argumentStructure.ordinalNumber);
 				SubscriberShutDown(queue, argumentStructure.socket, subscribers);
 				subscriberRunning = false;
 				break;
@@ -183,7 +185,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			EnterCriticalSection(&queueAccess);
 			Subscribe(queue, argumentStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.numberOfSubs, topic);
+			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.ordinalNumber, topic);
 
 		}
 		else if (!strcmp(recvbuf, "ErrorS")) {
@@ -262,11 +264,11 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 {
 	int iResult = 0;
 	char recvbuf[DEFAULT_BUFLEN];
-	SOCKET recvSocket = *(SOCKET*)lpParam;
+	ThreadArgument argumentStructure = *(ThreadArgument*)lpParam;
 
 	while (serverRunning) {
 
-		memcpy(recvbuf, ReceiveFunction(recvSocket, recvbuf), DEFAULT_BUFLEN);
+		memcpy(recvbuf, ReceiveFunction(argumentStructure.socket, recvbuf), DEFAULT_BUFLEN);
 		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR") && strcmp(recvbuf, "ErrorS"))
 		{
 			char delimiter[] = ":";
@@ -280,12 +282,13 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 
 			if (!strcmp(role, "p")) {
 				if (!strcmp(topic, "shutDown")) {
+					printf("Publisher %d disconnected.\n", argumentStructure.ordinalNumber);
 					break;
 				}
 				else {
 					ptr = strtok(NULL, delimiter);
 					EnterCriticalSection(&message_queueAccess);
-					Publish(message_queue, topic, message);
+					Publish(message_queue, topic, message, argumentStructure.ordinalNumber);
 					LeaveCriticalSection(&message_queueAccess);
 					ReleaseSemaphore(pubSubSemaphore, 1, NULL);
 
@@ -299,14 +302,14 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 		{
 			// connection was closed gracefully
 			printf("Connection with client closed.\n");
-			closesocket(recvSocket);
+			closesocket(argumentStructure.socket);
 			break;
 		}
 		else if (!strcmp(recvbuf, "ErrorR"))
 		{
 			// there was an error during recv
 			printf("recv failed with error: %d\n", WSAGetLastError());
-			closesocket(recvSocket);
+			closesocket(argumentStructure.socket);
 			break;
 
 		}
@@ -444,10 +447,10 @@ int  main(void)
 
 		char clientType = Connect(acceptedSockets[clientsCount]);
 		if (clientType=='s') {
-			SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
+			SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &subscriberThreadArgument, 0, &SubscriberThreadsID[numberOfSubscribers]);
 		}
 		else {
-			PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &PublisherThreadsID[numberOfPublishers]);
+			PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &publisherThreadArgument, 0, &PublisherThreadsID[numberOfPublishers]);
 		}
 		 //   memcpy(recvbuf, ReceiveFunction(acceptedSockets[clientsCount], recvbuf), DEFAULT_BUFLEN);
 			//if (strcmp(recvbuf,"ErrorC") && strcmp(recvbuf, "ErrorR"))

@@ -43,5 +43,5 @@ struct MessageStruct
 };
 struct ThreadArgument {
 	SOCKET socket;
-	int numberOfSubs;
+	int ordinalNumber;
 };
