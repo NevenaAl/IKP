@@ -1,6 +1,6 @@
 #include "Publisher.h"
 
-int possible = 1;
+bool appRunning = true;
 
 int __cdecl main(int argc, char **argv)
 {
@@ -49,10 +49,12 @@ int __cdecl main(int argc, char **argv)
 	int messageSize = messageDataSize + sizeof(int);
 
 	MessageStruct* messageStruct = GenerateMessageStruct(connect, messageDataSize);
-	SendFunction(connectSocket, (char*)messageStruct, messageSize);
+	int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
+	if (sendResult == -1)
+		serverStopped = true;
 
 	//PUBLISHER WHILE
-	while (possible) {
+	while (appRunning && !serverStopped) {
 
 		PrintMenu();
 		char c = _getch();
@@ -70,19 +72,23 @@ int __cdecl main(int argc, char **argv)
 			int messageDataSize = strlen(message) + 1;
 			int messageSize = messageDataSize + sizeof(int);
 
-			MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
-			SendFunction(connectSocket, (char*)messageStruct, messageSize);
+			MessageStruct* messageStructToSend = GenerateMessageStruct(message, messageDataSize);
+			int sendResult = SendFunction(connectSocket, (char*)messageStructToSend, messageSize);
+			if (sendResult == -1)
+				break;
 
+			free(messageStructToSend);
 		}
 		else if (c == 'x' || c == 'X') {
-			char shutDownMessage[20] = "p:shutDown";
+			char shutDownMessage[] = "p:shutDown";
 			int messageDataSize = strlen(shutDownMessage) + 1;
 			int messageSize = messageDataSize + sizeof(int);
 
-			MessageStruct* messageStruct = GenerateMessageStruct(shutDownMessage, messageDataSize);
-			SendFunction(connectSocket, (char*)messageStruct, messageSize);
-			possible = 0;
+			MessageStruct* messageStructToSend = GenerateMessageStruct(shutDownMessage, messageDataSize);
+			SendFunction(connectSocket, (char*)messageStructToSend, messageSize);
+			appRunning = false;
 			closesocket(connectSocket);
+			free(messageStructToSend);
 			break;
 		}
 		else {
@@ -92,6 +98,9 @@ int __cdecl main(int argc, char **argv)
 	}
 	
 	closesocket(connectSocket);
+
+	free(messageStruct);
+
 	WSACleanup();
 
 	return 0;

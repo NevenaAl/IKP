@@ -1,2 +1,3 @@
 ﻿  Client.cpp
-  Publisher.vcxproj -> D:\Desktop\IKP\PubSub\Debug\Publisher.exe
+c:\users\tanja\onedrive\documents\github\ikp\pubsub\publisher\publisher.h(144): warning C4715: 'SelectFunction': not all control paths return a value
+  Publisher.vcxproj -> C:\Users\tanja\OneDrive\Documents\GitHub\IKP\PubSub\Debug\Publisher.exe

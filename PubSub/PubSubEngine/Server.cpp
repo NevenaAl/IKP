@@ -6,8 +6,11 @@ CRITICAL_SECTION message_queueAccess;
 HANDLE pubSubSemaphore;
 
 
-struct Queue* queue = CreateQueue(2);
-struct MessageQueue* message_queue = CreateMessageQueue(1000);
+int clientsCount = 0;
+SOCKET acceptedSockets[NUMBER_OF_CLIENTS];
+
+struct Queue* queue = CreateQueue(10);
+struct MessageQueue* message_queue = CreateMessageQueue(10);
 topic_message current;
 struct node subscribers[20];
 
@@ -19,25 +22,46 @@ struct ThreadArgument {
 HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
 DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
 
-//DWORD WINAPI GetChar(LPVOID lpParam)
-//{
-//	char c;
-//	do {
-//		 c = _getch();
-//		 if (c == 'x' || c == 'X') {
-//			 CleanUp();
-//			 break;
-//		 }
-//
-//	} while (true);
-//	return 1;
-//}
+DWORD WINAPI GetChar(LPVOID lpParam)
+{
+	char c;
+	do {
+		printf("\nIf you want to quit please press X!\n");
+		 c = _getch();
+		 if (c == 'x' || c == 'X') {
+			 serverRunning = false;
+			 /*ReleaseSemaphore(pubSubSemaphore, 1, NULL);
+			 for (int i = 0; i < sizeof(subscribers); i++)
+			 {
+				 ReleaseSemaphore(subscribers[i].hSemaphore, 1, NULL);
+			 }*/
+			 int iResult = 0;
+			 for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
+
+				 iResult = shutdown(acceptedSockets[i], SD_SEND);
+				 if (iResult == SOCKET_ERROR)
+				 {
+					 printf("shutdown failed with error: %d\n", WSAGetLastError());
+					 closesocket(acceptedSockets[clientsCount]);
+					 WSACleanup();
+					 return 1;
+				 }
+				 closesocket(acceptedSockets[i]);
+			 }
+			 //WSACleanup();
+
+			 break;
+		 }
+
+	} while (serverRunning);
+	return 1;
+}
 
 DWORD WINAPI SubscriberWork(LPVOID lpParam)
 {
 	int iResult = 0;
 	SOCKET sendSocket = *(SOCKET*)lpParam;
-	while (true) {
+	while (serverRunning) {
 		for (int i = 0; i < (sizeof(subscribers) / sizeof(node)); i++)
 		{
 			if (sendSocket == subscribers[i].sendTo) {
@@ -46,12 +70,25 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 			}
 		}
 		
-		int messageDataSize = sizeof(topic_message);
+		if (!serverRunning)
+			break;
+
+		char* message = (char*)malloc(sizeof(topic_message) + 1);
+		memcpy(message, &current.topic, (strlen(current.topic)));
+		memcpy(message + (strlen(current.topic)), ":", 1);
+		memcpy(message + (strlen(current.topic) + 1), &current.message, (strlen(current.message) + 1));
+
+		int messageDataSize = strlen(message) + 1;
 		int messageSize = messageDataSize + sizeof(int);
 
-		MessageStruct* messageStruct = GenerateMessageStruct(&current, strlen((char*)&current.message)+1, strlen((char*)&current.topic)+1);
-		SendFunction(sendSocket, (char*)messageStruct, messageSize);
+		MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
+		int sendResult = SendFunction(sendSocket, (char*)messageStruct, messageSize);
+		if (sendResult == -1)
+			break;
 
+
+		//free(message);
+		//free(messageStruct);
 	}
 	return 1;
 }
@@ -59,9 +96,9 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	char recvbuf[DEFAULT_BUFLEN];
 	ThreadArgument argumentStructure = *(ThreadArgument*)lpParam;
-	
+	bool subscriberRunning = true;
 	memcpy(recvbuf,ReceiveFunction(argumentStructure.socket, recvbuf), DEFAULT_BUFLEN);
-	if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
+	if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR") && strcmp(recvbuf, "ErrorS"))
 	{
 		char delimiter[] = ":";
 		char *ptr = strtok(recvbuf, delimiter);
@@ -72,36 +109,44 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		ptr = strtok(NULL, delimiter);
 		if (!strcmp(topic, "shutDown")) {
 			SubscriberShutDown(queue, argumentStructure.socket, subscribers);
+			subscriberRunning = false;
+			return 0;
 		}
-		HANDLE hSem = CreateSemaphore(0, 0, 1, NULL);
+		else {
+			HANDLE hSem = CreateSemaphore(0, 0, 1, NULL);
 
-		struct node subscriber;
-		subscriber.sendTo = argumentStructure.socket;
-		subscriber.hSemaphore = hSem;
-		subscribers[argumentStructure.numberOfSubs] = subscriber;
+			struct node subscriber;
+			subscriber.sendTo = argumentStructure.socket;
+			subscriber.hSemaphore = hSem;
+			subscribers[argumentStructure.numberOfSubs] = subscriber;
 
-		SubscriberThreads[argumentStructure.numberOfSubs] = CreateThread(NULL, 0, &SubscriberWork, &argumentStructure.socket, 0, &SubscriberThreadsID[argumentStructure.numberOfSubs]);
+			SubscriberThreads[argumentStructure.numberOfSubs] = CreateThread(NULL, 0, &SubscriberWork, &argumentStructure.socket, 0, &SubscriberThreadsID[argumentStructure.numberOfSubs]);
 
-		EnterCriticalSection(&queueAccess);
-		Subscribe(queue, argumentStructure.socket, topic);
-		LeaveCriticalSection(&queueAccess);
-		printf("Subscriber %d subscribed to topic: %s. \n",argumentStructure.numberOfSubs, topic);
+			EnterCriticalSection(&queueAccess);
+			Subscribe(queue, argumentStructure.socket, topic);
+			LeaveCriticalSection(&queueAccess);
+			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.numberOfSubs, topic);
 		}
-		else if (!strcmp(recvbuf, "ErrorC"))
+	}
+	else if (!strcmp(recvbuf, "ErrorS")) {
+		return 1;
+	}
+	else if (!strcmp(recvbuf, "ErrorC"))
 		{
 			printf("Connection with client closed.\n");
 			closesocket(argumentStructure.socket);
-		}
-		else if (!strcmp(recvbuf, "ErrorR"))
-		{
+	}
+	else if (!strcmp(recvbuf, "ErrorR"))
+	{
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(argumentStructure.socket);
 
-		}
-	while (true) {
+	}
+
+	while (subscriberRunning && serverRunning) {
 
 		memcpy(recvbuf, ReceiveFunction(argumentStructure.socket, recvbuf), DEFAULT_BUFLEN);;
-		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
+		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR") && strcmp(recvbuf, "ErrorS"))
 		{
 			char delimiter[] = ":";
 			char *ptr = strtok(recvbuf, delimiter);
@@ -112,12 +157,18 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			ptr = strtok(NULL, delimiter);
 			if (!strcmp(topic, "shutDown")) {
 				SubscriberShutDown(queue, argumentStructure.socket, subscribers);
+				subscriberRunning = false;
+				break;
 			}
 			
 			EnterCriticalSection(&queueAccess);
 			Subscribe(queue, argumentStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
 			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.numberOfSubs, topic);
+
+		}
+		else if (!strcmp(recvbuf, "ErrorS")) {
+			break;
 		}
 		else if (!strcmp(recvbuf, "ErrorC"))
 		{
@@ -142,8 +193,10 @@ DWORD WINAPI PubSubWork(LPVOID lpParam) {
 	//return 0;
 	int iResult = 0;
 	SOCKET sendSocket;
-	while (true) {
+	while (serverRunning) {
 		WaitForSingleObject(pubSubSemaphore, INFINITE);
+		if (!serverRunning)
+			break;
 
 		EnterCriticalSection(&message_queueAccess);
 		current = DequeueMessageQueue(message_queue);
@@ -179,10 +232,10 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 	char recvbuf[DEFAULT_BUFLEN];
 	SOCKET recvSocket = *(SOCKET*)lpParam;
 
-	while (true) {
+	while (serverRunning) {
 
 		memcpy(recvbuf, ReceiveFunction(recvSocket, recvbuf), DEFAULT_BUFLEN);
-		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
+		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR") && strcmp(recvbuf, "ErrorS"))
 		{
 			char delimiter[] = ":";
 			char *ptr = strtok(recvbuf, delimiter);
@@ -194,12 +247,21 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 			char *message = ptr;
 
 			if (!strcmp(role, "p")) {
-				ptr = strtok(NULL, delimiter);
-				EnterCriticalSection(&message_queueAccess);
-				Publish(message_queue, topic, message);
-				LeaveCriticalSection(&message_queueAccess);
-				ReleaseSemaphore(pubSubSemaphore, 1, NULL);
+				if (!strcmp(topic, "shutDown")) {
+					break;
+				}
+				else {
+					ptr = strtok(NULL, delimiter);
+					EnterCriticalSection(&message_queueAccess);
+					Publish(message_queue, topic, message);
+					LeaveCriticalSection(&message_queueAccess);
+					ReleaseSemaphore(pubSubSemaphore, 1, NULL);
+
+				}
 			}
+		}
+		else if (!strcmp(recvbuf, "ErrorS")) {
+			break;
 		}
 		else if (!strcmp(recvbuf, "ErrorC"))
 		{
@@ -229,7 +291,7 @@ int  main(void)
 	Enqueue(queue, "News");
 	Enqueue(queue, "Show business");
 
-	int clientsCount = 0;
+	
 	int numberOfPublishers = 0;
 	int numberOfSubscribers = 0;
 
@@ -244,16 +306,13 @@ int  main(void)
 	HANDLE pubSubThread;
 	DWORD pubSubThreadID;
 
-	/*HANDLE exitThread;
-	DWORD exitThreadID;*/
+	HANDLE exitThread;
+	DWORD exitThreadID;
 
-	pubSubThread = CreateThread(NULL, 0, &PubSubWork, NULL, 0, &pubSubThreadID);
-	//exitThread = CreateThread(NULL, 0, &GetChar, NULL, 0, &exitThreadID);
-
+	
 	// Socket used for listening for new clients 
 	SOCKET listenSocket = INVALID_SOCKET;
 	// Socket used for communication with client
-	SOCKET acceptedSockets[NUMBER_OF_CLIENTS];
 	// variable used to store function return value
 	int iResult;
 	// Buffer used for storing incoming data
@@ -335,6 +394,11 @@ int  main(void)
 	}
 
 	printf("Server initialized, waiting for clients.\n");
+
+	pubSubThread = CreateThread(NULL, 0, &PubSubWork, NULL, 0, &pubSubThreadID);
+	exitThread = CreateThread(NULL, 0, &GetChar, NULL, 0, &exitThreadID);
+
+
 	//printf("Press X if you want to close server.\n");
 	do
 	{
@@ -392,7 +456,7 @@ int  main(void)
 
 		clientsCount++;
 
-	} while (clientsCount < NUMBER_OF_CLIENTS);
+	} while (clientsCount < NUMBER_OF_CLIENTS && serverRunning);
 
 	for (int i = 0; i < numberOfPublishers; i++) {
 
@@ -405,7 +469,14 @@ int  main(void)
 		if (SubscriberThreads[i])
 			WaitForSingleObject(SubscriberThreads[i], INFINITE);
 	}
+	 
+	if (pubSubThread) {
+		WaitForSingleObject(pubSubThread, INFINITE);
+	}
 
+	if (exitThread) {
+		WaitForSingleObject(exitThread, INFINITE);
+	}
 
 	printf("Server shutting down.");
 
@@ -420,10 +491,13 @@ int  main(void)
 		SAFE_DELETE_HANDLE(SubscriberThreads[i]);
 	}
 
+	SAFE_DELETE_HANDLE(pubSubThread);
+	SAFE_DELETE_HANDLE(exitThread);
+
 	// shutdown the connection since we're done
 	for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
 
-		iResult = shutdown(acceptedSockets[clientsCount], SD_SEND);
+		iResult = shutdown(acceptedSockets[i], SD_SEND);
 		if (iResult == SOCKET_ERROR)
 		{
 			printf("shutdown failed with error: %d\n", WSAGetLastError());
@@ -436,10 +510,12 @@ int  main(void)
 	// cleanup
 	closesocket(listenSocket);
 	
-	WSACleanup();
 
 	free(queue);
 	free(message_queue);
+
+	WSACleanup();
+
 
 	return 0;
 }

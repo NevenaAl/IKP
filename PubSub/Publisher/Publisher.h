@@ -21,12 +21,15 @@ struct MessageStruct
 
 }typedef MessageStruct;
 
+
+bool serverStopped = false;
+
 bool InitializeWindowsSockets();
 void EnterAndGenerateMessage(char* publish_message, char* message);
-void SelectFunction(SOCKET, char);
+int SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInput(char input, char* message);
-void SendFunction(SOCKET,char*,int);
+int SendFunction(SOCKET,char*,int);
 MessageStruct* GenerateMessageStruct(char* message, int len);
 
 MessageStruct* GenerateMessageStruct(char* message, int len) {
@@ -40,9 +43,12 @@ MessageStruct* GenerateMessageStruct(char* message, int len) {
 
 }
 
-void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
+int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
-	SelectFunction(connectSocket,'w');
+	int selectResult = SelectFunction(connectSocket,'w');
+	if (selectResult == -1) {
+		return -1;
+	}
 	int iResult = send(connectSocket, message, messageSize, 0);
 
 	if (iResult == SOCKET_ERROR)
@@ -50,7 +56,7 @@ void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 		printf("send failed with error: %d\n", WSAGetLastError());
 		closesocket(connectSocket);
 		WSACleanup();
-		return;
+		return 0;
 	}
 	else {
 
@@ -64,6 +70,7 @@ void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 	}
 
 	//printf("Bytes Sent: %ld\n", iResult);
+	return 1;
 }
 
 void EnterAndGenerateMessage(char* publish_message, char* message)
@@ -89,7 +96,8 @@ bool InitializeWindowsSockets()
 	}
 	return true;
 }
-void SelectFunction(SOCKET listenSocket, char rw) {
+
+int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
 	do {
 		FD_SET set;
@@ -103,6 +111,9 @@ void SelectFunction(SOCKET listenSocket, char rw) {
 		// instantaneously
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
+
+		if (serverStopped)
+			return -1;
 
 		if (rw == 'r') {
 			iResult = select(0 /* ignored */, &set, NULL, NULL, &timeVal);
@@ -156,6 +167,6 @@ void ProcessInput(char input, char* message) {
 		strcpy(message, "p:News");
 	}
 	else if (input == '5') {
-		strcpy(message, "p:Show buisness");
+		strcpy(message, "p:Show business");
 	}
 }

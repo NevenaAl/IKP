@@ -15,38 +15,44 @@
 #define NUMBER_OF_CLIENTS 40
 #define SAFE_DELETE_HANDLE(h) {if(h)CloseHandle(h);}
 
+
+bool serverRunning = true;
+
 struct MessageStruct
 {
 	int header;
-	topic_message message;
+	char message[DEFAULT_BUFLEN - 4];
 
 }typedef MessageStruct;
 
+
+
 bool InitializeWindowsSockets();
-void SelectFunction(SOCKET, char);
+int SelectFunction(SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
 void Publish(struct MessageQueue*, char*, char*);
 void SubscriberShutDown(Queue*, SOCKET, struct node subscribers[]);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
-void SendFunction(SOCKET connectSocket, char* message, int messageSize);
-MessageStruct* GenerateMessageStruct(topic_message* message, int lenMessage, int lenTopic);
+int SendFunction(SOCKET connectSocket, char* message, int messageSize);
+MessageStruct* GenerateMessageStruct(char* message, int len);
 
-MessageStruct* GenerateMessageStruct(topic_message* message, int lenMessage,int lenTopic) {
+
+MessageStruct* GenerateMessageStruct(char* message, int len) {
 
 	MessageStruct* messageStruct = (MessageStruct *)(malloc(sizeof(MessageStruct)));
 
-	messageStruct->header = sizeof(topic_message);
-	memcpy(messageStruct->message.message, message->message, lenMessage);
-	memcpy(messageStruct->message.topic, message->topic, lenTopic);
-
+	messageStruct->header = len;
+	memcpy(messageStruct->message, message, len);
 	return messageStruct;
 
 }
 
+int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
-void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
-
-	SelectFunction(connectSocket, 'w');
+	int selectResult = SelectFunction(connectSocket, 'w');
+	if (selectResult == -1) {
+		return -1;
+	}
 	int iResult = send(connectSocket, message, messageSize, 0);
 
 	if (iResult == SOCKET_ERROR)
@@ -54,7 +60,7 @@ void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 		printf("send failed with error: %d\n", WSAGetLastError());
 		closesocket(connectSocket);
 		WSACleanup();
-		return;
+		return 0;
 	}
 	else {
 
@@ -67,6 +73,7 @@ void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 		}
 	}
 
+	return 1;
 	//printf("Bytes Sent: %ld\n", iResult);
 }
 
@@ -75,7 +82,10 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
 
-		SelectFunction(acceptedSocket, 'r');
+		int selectResult = SelectFunction(acceptedSocket, 'r');
+		if (selectResult == -1) {
+			return "ErrorS";
+		}
 		iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
 
 		if (iResult > 0)
@@ -83,7 +93,7 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 			int bytesExpected = *((int*)recvbuf);
 			//printf("Size of message is : %d\n", bytesExpected);
 
-			char* myBuffer = (char*)(malloc(sizeof(bytesExpected))); // alociranje memorije za poruku
+			char* myBuffer = (char*)(malloc(bytesExpected)); // alociranje memorije za poruku
 
 			int cnt = 0;
 
@@ -167,8 +177,10 @@ void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
 	EnqueueMessageQueue(message_queue, item);
 
 	printf("\nPublisher published message: %s to topic: %s\n", item.message, item.topic);
+
 }
-void SelectFunction(SOCKET listenSocket, char rw) {
+
+int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
 	do {
 		FD_SET set;
@@ -180,6 +192,9 @@ void SelectFunction(SOCKET listenSocket, char rw) {
 
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
+
+		if (!serverRunning)
+			return -1;
 
 		if (rw == 'r') {
 			iResult = select(0 /* ignored */, &set, NULL, NULL, &timeVal);

@@ -8,8 +8,6 @@ struct topic_message {
 };
 
 
-int recvPossible = 1;
-int sendPossible = 1;
 
 // Initializes WinSock2 library
 // Returns true if succeeded, false otherwise.
@@ -32,19 +30,27 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 			int messageSize = messageDataSize + sizeof(int);
 
 			MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
-			SendFunction(connectSocket, (char*)messageStruct, messageSize);
+			int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
+			free(messageStruct);
+			if (sendResult == -1) {
+				return 1;
+			}
 
 		}
 		else if (c == 'x' || c == 'X') {
-			char shutDownMessage[20] = "s:shutDown";
+			char shutDownMessage[] = "s:shutDown";
 			int messageDataSize = strlen(shutDownMessage) + 1;
 			int messageSize = messageDataSize + sizeof(int);
-
+				
 			MessageStruct* messageStruct = GenerateMessageStruct(shutDownMessage, messageDataSize);
-			SendFunction(connectSocket, (char*)messageStruct, messageSize);
+			int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
+			free(messageStruct);
+			if (sendResult == -1) {
+				break;
+			}
 
-			sendPossible = 0;
-			recvPossible = 0;
+			sendPossible = false;
+			recvPossible = false;
 			closesocket(connectSocket);
 			break;
 		}
@@ -59,34 +65,48 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	int iResult = 0;
 	SOCKET connectSocket = *(SOCKET*)lpParam;
 	char recvbuf[DEFAULT_BUFLEN];
-	while (recvPossible) 
+	char* recvRes = (char*)malloc(DEFAULT_BUFLEN);
+
+	while (true) 
 	{
-		memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
-		if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
+		recvRes = ReceiveFunction(connectSocket, recvbuf);
+		//memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
+		if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 		{
-		  topic_message* structrecv = (topic_message*)malloc(sizeof(topic_message));
-		  topic_message msg = *(topic_message*)recvbuf;
+			char delimiter[] = ":";
+			char *ptr = strtok(recvRes, delimiter);
 
-		  strcpy(structrecv->message, msg.message);
-		  strcpy(structrecv->topic, msg.topic);
+			char *topic = ptr;
+			ptr = strtok(NULL, delimiter);
+			char *message = ptr;
+			ptr = strtok(NULL, delimiter);
 
-		  printf("\nNew message: %s on topic: %s\n", structrecv->message, structrecv->topic);
+			printf("\nNew message: %s on topic: %s\n", message, topic);
+
 		}
-		else if (!strcmp(recvbuf, "ErrorC"))
+		else if(!strcmp(recvRes, "ErrorS")) {
+			return 1;
+		}
+		else if (!strcmp(recvRes, "ErrorC"))
 		{
 		// connection was closed gracefully
 			printf("Connection with server closed.\n");
 			closesocket(connectSocket);
-			break;
+			sendPossible = false;
+			recvPossible = false;
+			return 1;
 		}
-		else if (!strcmp(recvbuf, "ErrorR"))
+		else if (!strcmp(recvRes, "ErrorR"))
 		{
 			// there was an error during recv
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(connectSocket);
-			break;
+			sendPossible = false;
+			recvPossible = false;
+			return 1;
 		}
 	}
+	free(recvRes);
 	return 1;
 }
 int __cdecl main(int argc, char **argv)
@@ -138,12 +158,13 @@ int __cdecl main(int argc, char **argv)
 	HANDLE SubscriberSendThread,SubscriberRecvThread;
 	DWORD SubscriberSendThreadId, SubscriberRecvThreadId;
 
-	char message[20] = "s:connect";
+	char message[] = "s:connect";
 	int messageDataSize = strlen(message) + 1;
 	int messageSize = messageDataSize + sizeof(int);
 
 	MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
 	SendFunction(connectSocket, (char*)messageStruct, messageSize);
+	
 
 	SubscriberSendThread = CreateThread(NULL, 0, &SubscriberSend, &connectSocket, 0, &SubscriberSendThreadId);
 	SubscriberRecvThread = CreateThread(NULL, 0, &SubscriberReceive, &connectSocket, 0, &SubscriberRecvThreadId);
@@ -162,6 +183,9 @@ int __cdecl main(int argc, char **argv)
 	SAFE_DELETE_HANDLE(SubscriberRecvThread);
 	// cleanup
 	closesocket(connectSocket);
+
+	free(messageStruct);
+
 	WSACleanup();
 
 	return 0;

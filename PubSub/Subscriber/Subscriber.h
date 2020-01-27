@@ -20,11 +20,15 @@ struct MessageStruct
 
 }typedef MessageStruct;
 
+
+bool recvPossible = true;
+bool sendPossible = true;
+
 bool InitializeWindowsSockets();
-void SelectFunction(SOCKET, char);
+int SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInputAndGenerateMessage(char input, char* message);
-void SendFunction(SOCKET, char*, int);
+int SendFunction(SOCKET, char*, int);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 MessageStruct* GenerateMessageStruct(char* message, int len);
 
@@ -43,7 +47,10 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
 
-	SelectFunction(acceptedSocket, 'r');
+	int selectResult = SelectFunction(acceptedSocket, 'r');
+	/*if (selectResult == -1) {
+		return "ErrorS";
+	}*/
 	iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
 
 	if (iResult > 0)
@@ -57,7 +64,11 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 		while (cnt < bytesExpected) {
 
-			SelectFunction(acceptedSocket, 'r');
+			int selectResult = SelectFunction(acceptedSocket, 'r');
+			if (selectResult == -1) {
+				return "ErrorS";
+			}
+
 			iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
 
 			//printf("Message received from client: %s.\n", myBuffer);
@@ -82,9 +93,12 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 	}
 
 }
-void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
+int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
-	SelectFunction(connectSocket, 'w');
+	int selectResult = SelectFunction(connectSocket, 'w');
+	if (selectResult == -1) {
+		return -1;
+	}
 	int iResult = send(connectSocket, message, messageSize, 0);
 
 	if (iResult == SOCKET_ERROR)
@@ -92,7 +106,7 @@ void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 		printf("send failed with error: %d\n", WSAGetLastError());
 		closesocket(connectSocket);
 		WSACleanup();
-		return;
+		return SOCKET_ERROR;
 	}
 	else {
 
@@ -105,6 +119,7 @@ void SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 		}
 	}
 
+	return 1;
 	//printf("Bytes Sent: %ld\n", iResult);
 }
 
@@ -120,7 +135,7 @@ bool InitializeWindowsSockets()
 	}
 	return true;
 }
-void SelectFunction(SOCKET listenSocket, char rw) {
+int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
 	do {
 		FD_SET set;
@@ -134,6 +149,14 @@ void SelectFunction(SOCKET listenSocket, char rw) {
 		// instantaneously
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
+
+		if (!recvPossible) {
+			return -1;
+		}
+
+		if (!sendPossible) {
+			return -1;
+		}
 
 		if (rw == 'r') {
 			iResult = select(0 /* ignored */, &set, NULL, NULL, &timeVal);
@@ -160,6 +183,8 @@ void SelectFunction(SOCKET listenSocket, char rw) {
 		break;
 		//NEW
 	} while (1);
+
+	return 1;
 
 }
 
