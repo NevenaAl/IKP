@@ -8,10 +8,15 @@ struct topic_message {
 };
 
 
-
-// Initializes WinSock2 library
-// Returns true if succeeded, false otherwise.
+///<summary>
+/// A function executing in thread created and run at the begining of main program. 
+/// It is used for sending messages to Server.
+///</summary>
+///<param name ="lpParam"> Socket used to communicate with Server. </param>
+///<returns>No return value.</returns>
 DWORD WINAPI SubscriberSend(LPVOID lpParam) {
+	int subscribed[5];
+	int numOfSubscribedTopics = 0;
 	int iResult = 0;
 	SOCKET connectSocket = *(SOCKET*)lpParam;
 	while (sendPossible) {
@@ -23,6 +28,14 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 		char message[20];
 
 		if (c == '1' || c == '2' || c == '3' || c == '4' || c == '5') {
+
+			if (AlreadySubscribed(c, subscribed, numOfSubscribedTopics)) {
+				printf("You are already subscribed to this topic.\n");
+				continue;
+			}
+
+			subscribed[numOfSubscribedTopics] = c - '0';
+			numOfSubscribedTopics++;
 
 			ProcessInputAndGenerateMessage(c, message);
 
@@ -61,6 +74,13 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 	}
 	return 1;
 }
+
+///<summary>
+/// A function executing in thread created and run at the begining of main program. 
+/// It is used for receiving messages from Server.
+///</summary>
+///<param name ="lpParam"> Socket used to communicate with Server. </param>
+///<returns>No return value.</returns>
 DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	int iResult = 0;
 	SOCKET connectSocket = *(SOCKET*)lpParam;

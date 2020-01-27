@@ -73,11 +73,20 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 	return 1;
 }
 
+///<summary>
+/// Entering message to publish and generating a string to send to server.
+///</summary>
+///<param name ="publish_message">Publisher's input message.</param>
+///<param name ="message">Generated message for sending.</param>
+///<returns>No return value.</returns>
 void EnterAndGenerateMessage(char* publish_message, char* message)
 {
 
-	printf("Enter message you want to publish:\n");
-	scanf("%s", publish_message);
+	printf("Enter message you want to publish(max length: 250): \n");
+	int c;
+	scanf("%249s", publish_message);
+	
+	while ((c = fgetc(stdin)) != '\n' && c != EOF);
 
 	strcat(message, ":");
 	strcat(message, publish_message);
@@ -143,6 +152,10 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 
 }
 
+///<summary>
+/// Printing Menu for interaction with publisher.
+///</summary>
+///<returns>No return value.</returns>
 void PrintMenu() {
 	printf("\nChoose a topic to publish to: \n");
 	printf("\t1.Sport\n");
@@ -153,6 +166,12 @@ void PrintMenu() {
 	printf("Press X if you want to close connection\n");
 }
 
+///<summary>
+/// Creates a new string depending on publisher's input.
+///</summary>
+///<param name ="input">Publisher's input.</param>
+///<param name ="rw">Message to copy to.</param>
+///<returns>No return value.</returns>
 void ProcessInput(char input, char* message) {
 	if (input == '1') {
 		strcpy(message, "p:Sport");

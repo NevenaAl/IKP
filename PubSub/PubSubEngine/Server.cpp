@@ -22,6 +22,12 @@ struct ThreadArgument {
 HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
 DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
 
+///<summary>
+/// A function executing in thread created and run at the beginning of the main program.
+/// It is used for receiving input that causes closing server application.
+///</summary>
+///<param name ="lpParam"></param>
+///<returns>No return value.</returns>
 DWORD WINAPI GetChar(LPVOID lpParam)
 {
 	char c;
@@ -57,6 +63,12 @@ DWORD WINAPI GetChar(LPVOID lpParam)
 	return 1;
 }
 
+///<summary>
+/// A function executing in thread created and run for each individual subscriber after he subscribes to a topic. 
+/// It is used for forwarding messages published by publisher and put on message queue.
+///</summary>
+///<param name ="lpParam"> Subscriber's socket.</param>
+///<returns> No return value.</returns>
 DWORD WINAPI SubscriberWork(LPVOID lpParam)
 {
 	int iResult = 0;
@@ -93,6 +105,13 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 	return 1;
 }
 
+///<summary>
+/// A function executing in thread created and run for each individual subscriber when he's connected. 
+/// It is used for receiving messages from subscriber.
+/// Enables subscribing on multiple topics.
+///</summary>
+///<param name ="lpParam"> A ThreadArgument structure that contains of a subscriber's socket and his ordinal number. </param>
+///<returns>No return value.</returns>
 DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	char recvbuf[DEFAULT_BUFLEN];
 	ThreadArgument argumentStructure = *(ThreadArgument*)lpParam;
@@ -188,6 +207,13 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	}
 	return 1;
 }
+
+///<summary>
+/// A function executing in thread created and run at the begining of the main program. 
+/// It is used for going through queue and message queue and determining which message has to be sent to which subscriber.
+///</summary>
+///<param name ="lpParam"></param>
+///<returns>No return value.</returns>
 DWORD WINAPI PubSubWork(LPVOID lpParam) {
 	//u ovom threadu send pa subscirber klijentu kad publisher nesto stavi u message queue
 	//return 0;
@@ -226,6 +252,12 @@ DWORD WINAPI PubSubWork(LPVOID lpParam) {
 	return 1;
 }
 
+///<summary>
+/// A function executing in thread created and run for each individual publisher when he's connected. 
+/// It is used for receiving messages from publisher.
+///</summary>
+///<param name ="lpParam"> Publisher's socket. </param>
+///<returns>No return value.</returns>
 DWORD WINAPI PublisherWork(LPVOID lpParam) 
 {
 	int iResult = 0;

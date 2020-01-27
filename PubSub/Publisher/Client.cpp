@@ -59,13 +59,13 @@ int __cdecl main(int argc, char **argv)
 		PrintMenu();
 		char c = _getch();
 
-		char message[120];
+		char message[270];
 
 		if (c == '1' || c=='2' || c=='3' || c=='4' || c=='5') {
 			
 			ProcessInput(c, message);
 
-			char publish_message[100];
+			char publish_message[250];
 
 			EnterAndGenerateMessage(publish_message, message);
 

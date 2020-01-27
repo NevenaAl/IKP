@@ -31,6 +31,17 @@ void ProcessInputAndGenerateMessage(char input, char* message);
 int SendFunction(SOCKET, char*, int);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 MessageStruct* GenerateMessageStruct(char* message, int len);
+bool AlreadySubscribed(char, int[], int);
+
+bool AlreadySubscribed(char c, int subscribed[], int numOfSubscribedTopics) {
+	for (int i = 0; i < numOfSubscribedTopics; i++) {
+		if (subscribed[i] == c - '0') {
+			return true;
+		}
+	}
+	return false;
+}
+
 
 MessageStruct* GenerateMessageStruct(char* message, int len) {
 
@@ -188,6 +199,10 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 
 }
 
+///<summary>
+/// Printing menu for interaction with subscriber.
+///</summary>
+///<returns>No return value.</returns>
 void PrintMenu() {
 	printf("\nChoose a topic to subscribe to: \n");
 	printf("\t1.Sport\n");
@@ -198,6 +213,12 @@ void PrintMenu() {
 	printf("Press X if you want to close connection\n");
 }
 
+///<summary>
+/// Generates message to send to server depending on input.
+///</summary>
+///<param name ="input">Input from subscriber.</param>
+///<param name ="message">Message to copy to.</param>
+///<returns>No return value.</returns>
 void ProcessInputAndGenerateMessage(char input, char* message) {
 	switch (input) {
 	case '1':

@@ -36,7 +36,12 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 int SendFunction(SOCKET connectSocket, char* message, int messageSize);
 MessageStruct* GenerateMessageStruct(char* message, int len);
 
-
+///<summary>
+/// Generates Message Struct with a header containing the lenght of a message.
+///</summary>
+///<param name ="message">Message.</param>
+///<param name ="len">Length of a message.</param>
+///<returns>Message Struct created.</returns>
 MessageStruct* GenerateMessageStruct(char* message, int len) {
 
 	MessageStruct* messageStruct = (MessageStruct *)(malloc(sizeof(MessageStruct)));
@@ -47,6 +52,13 @@ MessageStruct* GenerateMessageStruct(char* message, int len) {
 
 }
 
+///<summary>
+/// Sends a message through socket. Made for making sure the whole message has been sent.
+///</summary>
+///<param name ="connectSocket">Socket for sending message.</param>
+///<param name ="message">Message to send.</param>
+///<param name ="messageSize">Size of a message.</param>
+///<returns>No return value.</returns>
 int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
 	int selectResult = SelectFunction(connectSocket, 'w');
@@ -77,7 +89,12 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 	//printf("Bytes Sent: %ld\n", iResult);
 }
 
-
+///<summary>
+/// Receives a message through socket. Made for making sure the whole message has been received.
+///</summary>
+///<param name ="acceptedSocket">Socket for receiving message.</param>
+///<param name ="recvbuf">Buffer to receive message.</param>
+///<returns>Received message. Eror type in case of error.</returns>
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
@@ -125,7 +142,14 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 		
 }
 
-
+///<summary>
+/// Deletes subscriber from queue when he closes connection.
+/// Prevents trying to send a message on closed socket.
+///</summary>
+///<param name ="queue">Queue to delete from.</param>
+///<param name ="acceptedSocket">Subscriber's socket.</param>
+///<param name ="subscribers">Array of nodes(socket + semaphore).</param>
+///<returns>No return value.</returns>
 void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct node subscribers[]) {
 	for (int i = 0; i < queue->size; i++)
 	{
@@ -158,6 +182,13 @@ void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct node subscri
 	}
 }
 
+///<summary>
+/// Puts subscriber in queue when he subscribes on certain topic.
+///</summary>
+///<param name ="queue">Queue to add to.</param>
+///<param name ="sub">Subscriber's socket.</param>
+///<param name ="topic">Topic subscriber has subscribed to.</param>
+///<returns>No return value.</returns>
 void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 	for (int i = 0; i < queue->size; i++) {
 		if (!strcmp(queue->array[i].topic, topic)) {
@@ -168,6 +199,13 @@ void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 	}
 }
 
+///<summary>
+/// Puts message on message queue when publihser publishes on certain topic.
+///</summary>
+///<param name ="message_queue">Queue to add to.</param>
+///<param name ="message">Published message.</param>
+///<param name ="topic">Topic publisher has published to.</param>
+///<returns>No return value.</returns>
 void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
 	
 	topic_message item;
@@ -180,6 +218,14 @@ void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
 
 }
 
+
+///<summary>
+/// Select function used in nonblocking mode.
+/// Waits until send or receive is possible.
+///</summary>
+///<param name ="lisenSocket">Socket put in FD_SET.</param>
+///<param name ="rw">Char used to inform wich mode is used(read or write).</param>
+///<returns>No return value.</returns>
 int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
 	do {
@@ -221,6 +267,10 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 
 }
 
+///<summary>
+/// Initializes sockets.
+///</summary>
+///<returns>Error bool.</returns>
 bool InitializeWindowsSockets()
 {
 	WSADATA wsaData;
