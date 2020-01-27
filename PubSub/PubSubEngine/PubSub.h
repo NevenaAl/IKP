@@ -1,56 +1,28 @@
 #pragma once
-
 #define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <conio.h>
-#include "Queue.h"
-#include "Dictionary.h"
+#include "..\Common\SocketOperations.h"
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27016"
 #define SERVER_SLEEP_TIME 50
 #define NUMBER_OF_CLIENTS 40
-#define SAFE_DELETE_HANDLE(h) {if(h)CloseHandle(h);}
-
 
 bool serverRunning = true;
 
-struct MessageStruct
-{
-	int header;
-	char message[DEFAULT_BUFLEN - 4];
-
-}typedef MessageStruct;
-
-
-
-bool InitializeWindowsSockets();
 int SelectFunction(SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
 void Publish(struct MessageQueue*, char*, char*);
-void SubscriberShutDown(Queue*, SOCKET, struct node subscribers[]);
+void SubscriberShutDown(Queue*, SOCKET, struct Subscriber subscribers[]);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 int SendFunction(SOCKET connectSocket, char* message, int messageSize);
-MessageStruct* GenerateMessageStruct(char* message, int len);
 
-///<summary>
-/// Generates Message Struct with a header containing the lenght of a message.
-///</summary>
-///<param name ="message">Message.</param>
-///<param name ="len">Length of a message.</param>
-///<returns>Message Struct created.</returns>
-MessageStruct* GenerateMessageStruct(char* message, int len) {
 
-	MessageStruct* messageStruct = (MessageStruct *)(malloc(sizeof(MessageStruct)));
-
-	messageStruct->header = len;
-	memcpy(messageStruct->message, message, len);
-	return messageStruct;
-
-}
 
 ///<summary>
 /// Sends a message through socket. Made for making sure the whole message has been sent.
@@ -148,9 +120,9 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 ///</summary>
 ///<param name ="queue">Queue to delete from.</param>
 ///<param name ="acceptedSocket">Subscriber's socket.</param>
-///<param name ="subscribers">Array of nodes(socket + semaphore).</param>
+///<param name ="subscribers">Array of Subscribers(socket + semaphore).</param>
 ///<returns>No return value.</returns>
-void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct node subscribers[]) {
+void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct Subscriber subscribers[]) {
 	for (int i = 0; i < queue->size; i++)
 	{
 		for (int j = 0; j < queue->array[i].size; j++)
@@ -173,7 +145,7 @@ void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct node subscri
 
 	}
 
-	for (int i = 0; i < sizeof(subscribers)/sizeof(struct node); i++)
+	for (int i = 0; i < sizeof(subscribers)/sizeof(struct Subscriber); i++)
 	{
 		if (subscribers[i].sendTo == acceptedSocket) {
 			subscribers[i].sendTo = 0;
@@ -208,7 +180,7 @@ void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 ///<returns>No return value.</returns>
 void Publish(struct MessageQueue* message_queue, char* topic, char* message) {
 	
-	topic_message item;
+	struct topic_message item;
 	memcpy(item.message, message, strlen(message)+1);
 	memcpy(item.topic, topic, strlen(topic)+1);
 
@@ -267,19 +239,5 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 
 }
 
-///<summary>
-/// Initializes sockets.
-///</summary>
-///<returns>Error bool.</returns>
-bool InitializeWindowsSockets()
-{
-	WSADATA wsaData;
-	
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-	{
-		printf("WSAStartup failed with error: %d\n", WSAGetLastError());
-		return false;
-	}
-	return true;
-}
+
 

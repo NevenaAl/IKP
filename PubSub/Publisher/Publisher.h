@@ -1,7 +1,7 @@
 #pragma once
 #define WIN32_LEAN_AND_MEAN
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <windows.h>
 #include <winsock2.h>
@@ -9,39 +9,21 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <conio.h>
+#include "..\Common\SocketOperations.h"
+
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT 27016
 #define SERVER_SLEEP_TIME 50
 
-struct MessageStruct
-{
-	int header;
-	char message[DEFAULT_BUFLEN - 4];
-
-}typedef MessageStruct;
-
-
 bool serverStopped = false;
 
-bool InitializeWindowsSockets();
 void EnterAndGenerateMessage(char* publish_message, char* message);
 int SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInput(char input, char* message);
 int SendFunction(SOCKET,char*,int);
-MessageStruct* GenerateMessageStruct(char* message, int len);
 
-MessageStruct* GenerateMessageStruct(char* message, int len) {
-
-	MessageStruct* messageStruct = (MessageStruct *)(malloc(sizeof(MessageStruct)));
-
-	messageStruct->header = len;
-	memcpy(messageStruct->message, message, len);
-
-	return messageStruct;
-
-}
 
 int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
@@ -94,17 +76,6 @@ void EnterAndGenerateMessage(char* publish_message, char* message)
 	printf("You published message: %s.\n", publish_message);
 }
 
-bool InitializeWindowsSockets()
-{
-	WSADATA wsaData;
-	// Initialize windows sockets library for this process
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-	{
-		printf("WSAStartup failed with error: %d\n", WSAGetLastError());
-		return false;
-	}
-	return true;
-}
 
 int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;

@@ -1,13 +1,5 @@
 #include "Subscriber.h"
 
-#define SAFE_DELETE_HANDLE(h) {if(h)CloseHandle(h);}
-
-struct topic_message {
-	char topic[15];
-	char message[250];
-};
-
-
 ///<summary>
 /// A function executing in thread created and run at the begining of main program. 
 /// It is used for sending messages to Server.

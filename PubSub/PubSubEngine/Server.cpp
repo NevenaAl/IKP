@@ -11,8 +11,8 @@ SOCKET acceptedSockets[NUMBER_OF_CLIENTS];
 
 struct Queue* queue = CreateQueue(10);
 struct MessageQueue* message_queue = CreateMessageQueue(10);
-topic_message current;
-struct node subscribers[20];
+struct topic_message current;
+struct Subscriber subscribers[20];
 
 struct ThreadArgument {
 	SOCKET socket;
@@ -74,7 +74,7 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 	int iResult = 0;
 	SOCKET sendSocket = *(SOCKET*)lpParam;
 	while (serverRunning) {
-		for (int i = 0; i < (sizeof(subscribers) / sizeof(node)); i++)
+		for (int i = 0; i < (sizeof(subscribers) / sizeof(Subscriber)); i++)
 		{
 			if (sendSocket == subscribers[i].sendTo) {
 				WaitForSingleObject(subscribers[i].hSemaphore, INFINITE);
@@ -134,7 +134,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		else {
 			HANDLE hSem = CreateSemaphore(0, 0, 1, NULL);
 
-			struct node subscriber;
+			struct Subscriber subscriber;
 			subscriber.sendTo = argumentStructure.socket;
 			subscriber.hSemaphore = hSem;
 			subscribers[argumentStructure.numberOfSubs] = subscriber;
@@ -236,7 +236,7 @@ DWORD WINAPI PubSubWork(LPVOID lpParam) {
 				for (int j = 0; j < queue->array[i].size; j++)
 				{
 					sendSocket = queue->array[i].subs_array[j];
-					for (int i = 0; i < (sizeof(subscribers) / sizeof(node)); i++)
+					for (int i = 0; i < (sizeof(subscribers) / sizeof(Subscriber)); i++)
 					{
 						if (subscribers[i].sendTo == sendSocket) {
 							ReleaseSemaphore(subscribers[i].hSemaphore, 1, NULL);

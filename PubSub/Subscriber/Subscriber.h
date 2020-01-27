@@ -1,5 +1,7 @@
 #pragma once
 #define WIN32_LEAN_AND_MEAN
+#define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <windows.h>
 #include <winsock2.h>
@@ -7,30 +9,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <conio.h>
+#include "..\Common\SocketOperations.h"
 
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT 27016
 #define SERVER_SLEEP_TIME 50
 
-struct MessageStruct
-{
-	int header;
-	char message[DEFAULT_BUFLEN - 4];
-
-}typedef MessageStruct;
-
 
 bool recvPossible = true;
 bool sendPossible = true;
 
-bool InitializeWindowsSockets();
 int SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInputAndGenerateMessage(char input, char* message);
 int SendFunction(SOCKET, char*, int);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
-MessageStruct* GenerateMessageStruct(char* message, int len);
 bool AlreadySubscribed(char, int[], int);
 
 bool AlreadySubscribed(char c, int subscribed[], int numOfSubscribedTopics) {
@@ -42,17 +36,6 @@ bool AlreadySubscribed(char c, int subscribed[], int numOfSubscribedTopics) {
 	return false;
 }
 
-
-MessageStruct* GenerateMessageStruct(char* message, int len) {
-
-	MessageStruct* messageStruct = (MessageStruct *)(malloc(sizeof(MessageStruct)));
-
-	messageStruct->header = len;
-	memcpy(messageStruct->message, message, len);
-
-	return messageStruct;
-
-}
 
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
@@ -134,18 +117,6 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 	//printf("Bytes Sent: %ld\n", iResult);
 }
 
-
-bool InitializeWindowsSockets()
-{
-	WSADATA wsaData;
-	// Initialize windows sockets library for this process
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-	{
-		printf("WSAStartup failed with error: %d\n", WSAGetLastError());
-		return false;
-	}
-	return true;
-}
 int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
 	do {

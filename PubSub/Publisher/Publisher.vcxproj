@@ -24,6 +24,11 @@
   <ItemGroup>
     <ClInclude Include="Publisher.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.vcxproj">
+      <Project>{de871796-2b07-4248-994a-091f99afb74c}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{92231D35-8F86-4EEC-B965-79D1CE0A3552}</ProjectGuid>
