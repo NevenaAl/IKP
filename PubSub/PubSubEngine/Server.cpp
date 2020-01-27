@@ -14,13 +14,12 @@ struct MessageQueue* message_queue = CreateMessageQueue(10);
 struct topic_message current;
 struct Subscriber subscribers[20];
 
-struct ThreadArgument {
-	SOCKET socket;
-	int numberOfSubs;
-};
 
 HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
 DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
+
+HANDLE PublisherThreads[NUMBER_OF_CLIENTS];
+DWORD PublisherThreadsID[NUMBER_OF_CLIENTS];
 
 ///<summary>
 /// A function executing in thread created and run at the beginning of the main program.
@@ -31,35 +30,36 @@ DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
 DWORD WINAPI GetChar(LPVOID lpParam)
 {
 	char c;
-	do {
+	while(serverRunning) {
 		printf("\nIf you want to quit please press X!\n");
 		 c = _getch();
 		 if (c == 'x' || c == 'X') {
 			 serverRunning = false;
-			 /*ReleaseSemaphore(pubSubSemaphore, 1, NULL);
+			 ReleaseSemaphore(pubSubSemaphore, 1, NULL);
 			 for (int i = 0; i < sizeof(subscribers); i++)
 			 {
 				 ReleaseSemaphore(subscribers[i].hSemaphore, 1, NULL);
-			 }*/
+			 }
 			 int iResult = 0;
-			 for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
+			 for (int i = 0; i < clientsCount; i++) {
 
-				 iResult = shutdown(acceptedSockets[i], SD_SEND);
+				 iResult = shutdown(acceptedSockets[i], SD_BOTH);
 				 if (iResult == SOCKET_ERROR)
 				 {
 					 printf("shutdown failed with error: %d\n", WSAGetLastError());
-					 closesocket(acceptedSockets[clientsCount]);
+					 closesocket(acceptedSockets[i]);
 					 WSACleanup();
 					 return 1;
 				 }
 				 closesocket(acceptedSockets[i]);
 			 }
+			 closesocket(*(SOCKET*)lpParam);
 			 //WSACleanup();
 
 			 break;
 		 }
 
-	} while (serverRunning);
+	} 
 	return 1;
 }
 
@@ -323,17 +323,10 @@ int  main(void)
 	Enqueue(queue, "News");
 	Enqueue(queue, "Show business");
 
-	
-	int numberOfPublishers = 0;
-	int numberOfSubscribers = 0;
-
 	InitializeCriticalSection(&queueAccess);
 	InitializeCriticalSection(&message_queueAccess);
 
 	pubSubSemaphore = CreateSemaphore(0, 0, 1, NULL);
-
-	HANDLE PublisherThreads[NUMBER_OF_CLIENTS];
-	DWORD PublisherThreadsID[NUMBER_OF_CLIENTS];
 
 	HANDLE pubSubThread;
 	DWORD pubSubThreadID;
@@ -428,13 +421,16 @@ int  main(void)
 	printf("Server initialized, waiting for clients.\n");
 
 	pubSubThread = CreateThread(NULL, 0, &PubSubWork, NULL, 0, &pubSubThreadID);
-	exitThread = CreateThread(NULL, 0, &GetChar, NULL, 0, &exitThreadID);
+	exitThread = CreateThread(NULL, 0, &GetChar, &listenSocket, 0, &exitThreadID);
 
 
 	//printf("Press X if you want to close server.\n");
-	do
+	while (clientsCount < NUMBER_OF_CLIENTS && serverRunning)
 	{
-		SelectFunction(listenSocket, 'r');
+		int selectResult = SelectFunction(listenSocket, 'r');
+		if (selectResult == -1) {
+			break;
+		}
 
 		acceptedSockets[clientsCount] = accept(listenSocket, NULL, NULL);
 
@@ -446,49 +442,56 @@ int  main(void)
 			return 1;
 		}
 
-		    memcpy(recvbuf, ReceiveFunction(acceptedSockets[clientsCount], recvbuf), DEFAULT_BUFLEN);
-			if (strcmp(recvbuf,"ErrorC") && strcmp(recvbuf, "ErrorR"))
-			{
-				char delimiter[] = ":";
-				char *ptr = strtok(recvbuf, delimiter);
+		char clientType = Connect(acceptedSockets[clientsCount]);
+		if (clientType=='s') {
+			SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
+		}
+		else {
+			PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &PublisherThreadsID[numberOfPublishers]);
+		}
+		 //   memcpy(recvbuf, ReceiveFunction(acceptedSockets[clientsCount], recvbuf), DEFAULT_BUFLEN);
+			//if (strcmp(recvbuf,"ErrorC") && strcmp(recvbuf, "ErrorR"))
+			//{
+			//	char delimiter[] = ":";
+			//	char *ptr = strtok(recvbuf, delimiter);
 
-				char *role = ptr;
-				ptr = strtok(NULL, delimiter);
+			//	char *role = ptr;
+			//	ptr = strtok(NULL, delimiter);
 
-				if (!strcmp(role, "s")) {
-					ThreadArgument argumentStructure;
-					argumentStructure.numberOfSubs = numberOfSubscribers;
-					argumentStructure.socket = acceptedSockets[clientsCount];
-					SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
-					printf("Subscriber %d connected.\n", numberOfSubscribers);
-					numberOfSubscribers++;
+			//	if (!strcmp(role, "s")) {
+			//		ThreadArgument argumentStructure;
+			//		argumentStructure.numberOfSubs = numberOfSubscribers;
+			//		argumentStructure.socket = acceptedSockets[clientsCount];
+			//		SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
+			//		printf("Subscriber %d connected.\n", numberOfSubscribers);
+			//		numberOfSubscribers++;
 
-				}
+			//	}
 
-				if (!strcmp(role, "p")) {
+			//	if (!strcmp(role, "p")) {
 
-					PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &PublisherThreadsID[numberOfPublishers]);
-					printf("Publisher %d connected.\n",numberOfPublishers);
-					numberOfPublishers++;
-				}
-			}
-			else if (!strcmp(recvbuf, "ErrorC"))
-			{
-				// connection was closed gracefully
-				printf("Connection with client closed.\n");
-				closesocket(acceptedSockets[clientsCount]);
-			}
-			else if (!strcmp(recvbuf, "ErrorR"))
-			{
-				// there was an error during recv
-				printf("recv failed with error: %d\n", WSAGetLastError());
-				closesocket(acceptedSockets[clientsCount]);
-			}
+			//		PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSockets[clientsCount], 0, &PublisherThreadsID[numberOfPublishers]);
+			//		printf("Publisher %d connected.\n",numberOfPublishers);
+			//		numberOfPublishers++;
+			//	}
+			//}
+			//else if (!strcmp(recvbuf, "ErrorC"))
+			//{
+			//	// connection was closed gracefully
+			//	printf("Connection with client closed.\n");
+			//	closesocket(acceptedSockets[clientsCount]);
+			//}
+			//else if (!strcmp(recvbuf, "ErrorR"))
+			//{
+			//	// there was an error during recv
+			//	printf("recv failed with error: %d\n", WSAGetLastError());
+			//	closesocket(acceptedSockets[clientsCount]);
+			//}
 		
 
 		clientsCount++;
 
-	} while (clientsCount < NUMBER_OF_CLIENTS && serverRunning);
+	} 
 
 	for (int i = 0; i < numberOfPublishers; i++) {
 
@@ -526,23 +529,26 @@ int  main(void)
 	SAFE_DELETE_HANDLE(pubSubThread);
 	SAFE_DELETE_HANDLE(exitThread);
 
-	// shutdown the connection since we're done
-	for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
 
-		iResult = shutdown(acceptedSockets[i], SD_SEND);
-		if (iResult == SOCKET_ERROR)
-		{
-			printf("shutdown failed with error: %d\n", WSAGetLastError());
-			closesocket(acceptedSockets[clientsCount]);
-			WSACleanup();
-			return 1;
+	if (serverRunning) {
+		// shutdown the connection since we're done
+		for (int i = 0; i < NUMBER_OF_CLIENTS; i++) {
+
+			iResult = shutdown(acceptedSockets[i], SD_SEND);
+			if (iResult == SOCKET_ERROR)
+			{
+				printf("shutdown failed with error: %d\n", WSAGetLastError());
+				closesocket(acceptedSockets[clientsCount]);
+				WSACleanup();
+				return 1;
+			}
+			closesocket(acceptedSockets[i]);
 		}
-		closesocket(acceptedSockets[i]);
-	}
-	// cleanup
-	closesocket(listenSocket);
-	
+		// cleanup
+		closesocket(listenSocket);
 
+	}
+	
 	free(queue);
 	free(message_queue);
 

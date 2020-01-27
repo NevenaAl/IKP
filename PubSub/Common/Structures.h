@@ -35,10 +35,13 @@ struct Subscriber {
 	HANDLE hSemaphore;
 };
 
-
 struct MessageStruct
 {
 	int header;
 	char message[DEFAULT_BUFLEN - 4];
 
+};
+struct ThreadArgument {
+	SOCKET socket;
+	int numberOfSubs;
 };

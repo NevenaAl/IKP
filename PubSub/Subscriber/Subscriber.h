@@ -42,9 +42,9 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 	int iResult;
 
 	int selectResult = SelectFunction(acceptedSocket, 'r');
-	/*if (selectResult == -1) {
+	if (selectResult == -1) {
 		return "ErrorS";
-	}*/
+	}
 	iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
 
 	if (iResult > 0)
@@ -73,16 +73,10 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 	}
 	else if (iResult == 0)
 	{
-		// connection was closed gracefully
-		//printf("Connection with client closed.\n");
-		//closesocket(acceptedSocket);
 		return "ErrorC";
 	}
 	else
 	{
-		// there was an error during recv
-		//printf("recv failed with error: %d\n", WSAGetLastError());
-		//closesocket(acceptedSocket);
 		return "ErrorR";
 	}
 
@@ -119,7 +113,7 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
 int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
-	do {
+	while(true) {
 		FD_SET set;
 		timeval timeVal;
 
@@ -164,7 +158,7 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		}
 		break;
 		//NEW
-	} while (1);
+	}
 
 	return 1;
 

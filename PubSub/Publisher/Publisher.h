@@ -17,13 +17,14 @@
 #define SERVER_SLEEP_TIME 50
 
 bool serverStopped = false;
+bool appRunning = true;
 
 void EnterAndGenerateMessage(char* publish_message, char* message);
 int SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInput(char input, char* message);
 int SendFunction(SOCKET,char*,int);
-
+char* ReceiveFunction(SOCKET, char*);
 
 int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
@@ -76,6 +77,31 @@ void EnterAndGenerateMessage(char* publish_message, char* message)
 	printf("You published message: %s.\n", publish_message);
 }
 
+char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
+
+	int iResult;
+
+	int selectResult = SelectFunction(acceptedSocket, 'r');
+	if (selectResult == -1) {
+		char ret[7] = "ErrorS";
+		return ret;
+	}
+	iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
+
+    if (iResult == 0)
+	{
+		char ret[7] = "ErrorC";
+		return ret;
+	}
+	else if(iResult == SOCKET_ERROR)
+	{
+		char ret[7] = "ErrorR";
+		return ret;
+	}
+
+}
+
+
 
 int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
@@ -94,7 +120,9 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 
 		if (serverStopped)
 			return -1;
-
+		if (!appRunning) {
+			return -1;
+		}
 		if (rw == 'r') {
 			iResult = select(0 /* ignored */, &set, NULL, NULL, &timeVal);
 		}

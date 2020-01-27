@@ -36,7 +36,7 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 
 			MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
 			int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
-			free(messageStruct);
+			//free(messageStruct);
 			if (sendResult == -1) {
 				return 1;
 			}
@@ -49,7 +49,7 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 				
 			MessageStruct* messageStruct = GenerateMessageStruct(shutDownMessage, messageDataSize);
 			int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
-			free(messageStruct);
+			//free(messageStruct);
 			if (sendResult == -1) {
 				break;
 			}
@@ -77,9 +77,9 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	int iResult = 0;
 	SOCKET connectSocket = *(SOCKET*)lpParam;
 	char recvbuf[DEFAULT_BUFLEN];
-	char* recvRes = (char*)malloc(DEFAULT_BUFLEN);
+	char* recvRes; // = (char*)malloc(DEFAULT_BUFLEN);
 
-	while (true) 
+	while (recvPossible) 
 	{
 		recvRes = ReceiveFunction(connectSocket, recvbuf);
 		//memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
@@ -97,16 +97,22 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 
 		}
 		else if(!strcmp(recvRes, "ErrorS")) {
-			return 1;
+
+			//free(recvRes);
+			//return 1;
+			break;
 		}
 		else if (!strcmp(recvRes, "ErrorC"))
 		{
 		// connection was closed gracefully
-			printf("Connection with server closed.\n");
+			printf("\nConnection with server closed.\n");
+			printf("Press any key to close this window . . .");
 			closesocket(connectSocket);
 			sendPossible = false;
 			recvPossible = false;
-			return 1;
+			/*free(recvRes);
+			return 1;*/
+			break;
 		}
 		else if (!strcmp(recvRes, "ErrorR"))
 		{
@@ -115,10 +121,12 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			closesocket(connectSocket);
 			sendPossible = false;
 			recvPossible = false;
-			return 1;
+			/*free(recvRes);
+			return 1;*/
+			break;
 		}
 	}
-	free(recvRes);
+	//free(recvRes);
 	return 1;
 }
 int __cdecl main(int argc, char **argv)

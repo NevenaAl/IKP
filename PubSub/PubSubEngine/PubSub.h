@@ -15,12 +15,63 @@
 
 bool serverRunning = true;
 
+
+int numberOfPublishers = 0;
+int numberOfSubscribers = 0;
+ThreadArgument argumentStructure;
+
 int SelectFunction(SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
 void Publish(struct MessageQueue*, char*, char*);
 void SubscriberShutDown(Queue*, SOCKET, struct Subscriber subscribers[]);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 int SendFunction(SOCKET connectSocket, char* message, int messageSize);
+char Connect(SOCKET, int, int);
+
+char Connect(SOCKET acceptedSocket) {
+	char recvbuf[DEFAULT_BUFLEN];
+
+	memcpy(recvbuf, ReceiveFunction(acceptedSocket, recvbuf), DEFAULT_BUFLEN);
+	if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
+	{
+		char delimiter[] = ":";
+		char *ptr = strtok(recvbuf, delimiter);
+
+		char *role = ptr;
+		ptr = strtok(NULL, delimiter);
+
+		if (!strcmp(role, "s")) {
+			
+			argumentStructure.numberOfSubs = numberOfSubscribers;
+			argumentStructure.socket = acceptedSocket;
+			//SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
+			printf("Subscriber %d connected.\n", numberOfSubscribers);
+			numberOfSubscribers++;
+			return 's';
+		}
+
+		if (!strcmp(role, "p")) {
+
+			//PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSocket, 0, &PublisherThreadsID[numberOfPublishers]);
+			printf("Publisher %d connected.\n", numberOfPublishers);
+			numberOfPublishers++;
+			return 'p';
+		}
+		
+	}
+	else if (!strcmp(recvbuf, "ErrorC"))
+	{
+		// connection was closed gracefully
+		printf("Connection with client closed.\n");
+		closesocket(acceptedSocket);
+	}
+	else if (!strcmp(recvbuf, "ErrorR"))
+	{
+		// there was an error during recv
+		printf("recv failed with error: %d\n", WSAGetLastError());
+		closesocket(acceptedSocket);
+	}
+}
 
 
 
