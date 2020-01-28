@@ -27,6 +27,8 @@ DWORD WINAPI CloseHandles(LPVOID lpParam) {
 				if (publisherThreadKilled == i) {
 					if (PublisherThreads[i] != INVALID_HANDLE_VALUE) {
 						SAFE_DELETE_HANDLE(PublisherThreads[i]);
+						PublisherThreads[i] = 0;
+						publisherThreadKilled = -1;
 					}
 					
 
@@ -38,6 +40,8 @@ DWORD WINAPI CloseHandles(LPVOID lpParam) {
 			for (int i = 0; i < numberOfSubscribers; i++) {
 				if (subscriberThreadKilled == i) {
 					SAFE_DELETE_HANDLE(SubscriberThreads[i]);
+					SubscriberThreads[i] = 0;
+					subscriberThreadKilled = -1;
 
 				}
 			}
@@ -536,6 +540,9 @@ int  main(void)
 	if (exitThread) {
 		WaitForSingleObject(exitThread, INFINITE);
 	}
+	if (closeHandlesThread) {
+		WaitForSingleObject(closeHandlesThread, INFINITE);
+	}
 
 	printf("Server shutting down.");
 
@@ -552,7 +559,7 @@ int  main(void)
 
 	SAFE_DELETE_HANDLE(pubSubThread);
 	SAFE_DELETE_HANDLE(exitThread);
-
+	SAFE_DELETE_HANDLE(closeHandlesThread);
 
 	if (serverRunning) {
 		// shutdown the connection since we're done
