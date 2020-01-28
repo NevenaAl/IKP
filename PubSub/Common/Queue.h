@@ -102,7 +102,8 @@ int IsEmptyMessageQueue(struct MessageQueue*  queue)
 void Enqueue(struct Queue* queue, char* topic)
 {
 	topic_sub item;
-	item.topic = topic;
+	//item.topic = topic;
+	strcpy(item.topic, topic);
 	//item.subs_array;
 	item.size = 0;
 

@@ -15,6 +15,7 @@
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT 27016
 #define SERVER_SLEEP_TIME 50
+#define MAX_MESSAGE_SIZE 250
 
 bool serverStopped = false;
 bool appRunning = true;
@@ -25,6 +26,25 @@ void PrintMenu();
 void ProcessInput(char input, char* message);
 int SendFunction(SOCKET,char*,int);
 char* ReceiveFunction(SOCKET, char*);
+int Connect(SOCKET);
+
+int Connect(SOCKET connectSocket) {
+	//char connect[] = "p:Connect";
+	char* connect = (char*)malloc(10 * sizeof(char));
+	strcpy(connect, "p:Connect");
+
+	int messageDataSize = strlen(connect) + 1;
+	int messageSize = messageDataSize + sizeof(int);
+
+	MessageStruct* messageStruct = GenerateMessageStruct(connect, messageDataSize);
+
+	int retVal = SendFunction(connectSocket, (char*)messageStruct, messageSize);
+	free(messageStruct);
+	free(connect);
+
+	return retVal;
+
+}
 
 int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
@@ -66,11 +86,17 @@ void EnterAndGenerateMessage(char* publish_message, char* message)
 {
 
 	printf("Enter message you want to publish(max length: 250): \n");
-	int c;
-	scanf("%249s", publish_message);
 	
-	while ((c = fgetc(stdin)) != '\n' && c != EOF);
-
+	//scanf("%249s", publish_message);
+	fgets(publish_message, MAX_MESSAGE_SIZE, stdin);
+	if (strchr(publish_message, '\n') == NULL) {
+		int c;
+		while ((c = fgetc(stdin)) != '\n' && c != EOF);
+	}
+	
+	if ((strlen(publish_message) > 0) && (publish_message[strlen(publish_message) - 1] == '\n'))
+		publish_message[strlen(publish_message) - 1] = '\0';
+	
 	strcat(message, ":");
 	strcat(message, publish_message);
 
@@ -80,25 +106,23 @@ void EnterAndGenerateMessage(char* publish_message, char* message)
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
-
+	char* retVal = (char*)malloc(7 * sizeof(char));
 	int selectResult = SelectFunction(acceptedSocket, 'r');
 	if (selectResult == -1) {
-		char ret[7] = "ErrorS";
-		return ret;
+		memcpy(retVal, "ErrorS", 7);	
+		return retVal;
 	}
 	iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
 
     if (iResult == 0)
 	{
-		char ret[7] = "ErrorC";
-		return ret;
+		memcpy(retVal, "ErrorC", 7);	
 	}
 	else if(iResult == SOCKET_ERROR)
 	{
-		char ret[7] = "ErrorR";
-		return ret;
+		memcpy(retVal, "ErrorR", 7);
 	}
-
+	return retVal;
 }
 
 

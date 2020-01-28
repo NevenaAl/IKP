@@ -17,7 +17,7 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 
 		char c = _getch();
 
-		char message[20];
+		char* message = (char*)malloc(20 * sizeof(char));
 
 		if (c == '1' || c == '2' || c == '3' || c == '4' || c == '5') {
 
@@ -36,20 +36,22 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 
 			MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
 			int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
-			//free(messageStruct);
+			free(messageStruct);
+			free(message);
 			if (sendResult == -1) {
 				return 1;
 			}
 
 		}
 		else if (c == 'x' || c == 'X') {
-			char shutDownMessage[] = "s:shutDown";
-			int messageDataSize = strlen(shutDownMessage) + 1;
+			strcpy(message, "s:shutDown");
+			int messageDataSize = strlen(message) + 1;
 			int messageSize = messageDataSize + sizeof(int);
 				
-			MessageStruct* messageStruct = GenerateMessageStruct(shutDownMessage, messageDataSize);
+			MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
 			int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
-			//free(messageStruct);
+			free(messageStruct);
+			free(message);
 			if (sendResult == -1) {
 				break;
 			}
@@ -61,6 +63,7 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 		}
 		else {
 			printf("Invalid input.\n");
+			free(message);
 			continue;
 		}
 	}
@@ -85,13 +88,14 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		//memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
 		if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 		{
-			char delimiter[] = ":";
-			char *ptr = strtok(recvRes, delimiter);
+			//char delimiter[] = ":";
+			char delimiter = ':';
+			char *ptr = strtok(recvRes, &delimiter);
 
 			char *topic = ptr;
-			ptr = strtok(NULL, delimiter);
+			ptr = strtok(NULL, &delimiter);
 			char *message = ptr;
-			ptr = strtok(NULL, delimiter);
+			ptr = strtok(NULL, &delimiter);
 
 			printf("\nNew message: %s on topic: %s\n", message, topic);
 
@@ -125,8 +129,10 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			return 1;*/
 			break;
 		}
+
+		free(recvRes);
 	}
-	//free(recvRes);
+	free(recvRes);
 	return 1;
 }
 int __cdecl main(int argc, char **argv)
@@ -178,12 +184,11 @@ int __cdecl main(int argc, char **argv)
 	HANDLE SubscriberSendThread,SubscriberRecvThread;
 	DWORD SubscriberSendThreadId, SubscriberRecvThreadId;
 
-	char message[] = "s:connect";
-	int messageDataSize = strlen(message) + 1;
-	int messageSize = messageDataSize + sizeof(int);
-
-	MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
-	SendFunction(connectSocket, (char*)messageStruct, messageSize);
+	int connectResult = Connect(connectSocket);
+	if (connectResult == -1) {
+		sendPossible = false;
+		recvPossible = false;
+	}
 	
 
 	SubscriberSendThread = CreateThread(NULL, 0, &SubscriberSend, &connectSocket, 0, &SubscriberSendThreadId);
@@ -204,7 +209,6 @@ int __cdecl main(int argc, char **argv)
 	// cleanup
 	closesocket(connectSocket);
 
-	free(messageStruct);
 
 	WSACleanup();
 

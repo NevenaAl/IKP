@@ -14,8 +14,7 @@
 #define NUMBER_OF_CLIENTS 40
 
 bool serverRunning = true;
-
-
+int clientsCount = 0;
 int numberOfPublishers = 0;
 int numberOfSubscribers = 0;
 ThreadArgument publisherThreadArgument;
@@ -27,52 +26,69 @@ void Publish(struct MessageQueue*, char*, char*,int);
 void SubscriberShutDown(Queue*, SOCKET, struct Subscriber subscribers[]);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 int SendFunction(SOCKET connectSocket, char* message, int messageSize);
-char Connect(SOCKET, int, int);
+char Connect(SOCKET);
+void AddTopics(Queue*);
+
+void AddTopics(Queue* queue) {
+
+	Enqueue(queue, "Sport");
+	Enqueue(queue, "Fashion");
+	Enqueue(queue, "Politics");
+	Enqueue(queue, "News");
+	Enqueue(queue, "Show business");
+}
 
 char Connect(SOCKET acceptedSocket) {
 	char recvbuf[DEFAULT_BUFLEN];
-
-	memcpy(recvbuf, ReceiveFunction(acceptedSocket, recvbuf), DEFAULT_BUFLEN);
-	if (strcmp(recvbuf, "ErrorC") && strcmp(recvbuf, "ErrorR"))
+	char *recvRes;
+	//memcpy(recvbuf, ReceiveFunction(acceptedSocket, recvbuf), DEFAULT_BUFLEN);
+	recvRes = ReceiveFunction(acceptedSocket, recvbuf);
+	if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR"))
 	{
-		char delimiter[] = ":";
-		char *ptr = strtok(recvbuf, delimiter);
+		//char delimiter[] = ":";
+		char delimiter = ':';
+		char *ptr = strtok(recvRes, &delimiter);
 
 		char *role = ptr;
-		ptr = strtok(NULL, delimiter);
+		ptr = strtok(NULL, &delimiter);
 
 		if (!strcmp(role, "s")) {
 			
 			subscriberThreadArgument.ordinalNumber = numberOfSubscribers;
 			subscriberThreadArgument.socket = acceptedSocket;
+			subscriberThreadArgument.clientNumber = clientsCount;
 			//SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
 			printf("Subscriber %d connected.\n", numberOfSubscribers);
-			numberOfSubscribers++;
+			
+			free(recvRes);
 			return 's';
 		}
 
 		if (!strcmp(role, "p")) {
 			publisherThreadArgument.ordinalNumber = numberOfPublishers;
 			publisherThreadArgument.socket = acceptedSocket;
+			publisherThreadArgument.clientNumber = clientsCount;
 			//PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSocket, 0, &PublisherThreadsID[numberOfPublishers]);
 			printf("Publisher %d connected.\n", numberOfPublishers);
-			numberOfPublishers++;
+			
+			free(recvRes);
 			return 'p';
 		}
 		
 	}
-	else if (!strcmp(recvbuf, "ErrorC"))
+	else if (!strcmp(recvRes, "ErrorC"))
 	{
 		// connection was closed gracefully
 		printf("Connection with client closed.\n");
 		closesocket(acceptedSocket);
 	}
-	else if (!strcmp(recvbuf, "ErrorR"))
+	else if (!strcmp(recvRes, "ErrorR"))
 	{
 		// there was an error during recv
 		printf("recv failed with error: %d\n", WSAGetLastError());
 		closesocket(acceptedSocket);
 	}
+	free(recvRes);
 }
 
 
@@ -123,10 +139,12 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
+	char* myBuffer = (char*)(malloc(DEFAULT_BUFLEN));
 
 		int selectResult = SelectFunction(acceptedSocket, 'r');
 		if (selectResult == -1) {
-			return "ErrorS";
+			memcpy(myBuffer, "ErrorS", 7);
+			return myBuffer;
 		}
 		iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
 
@@ -135,7 +153,7 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 			int bytesExpected = *((int*)recvbuf);
 			//printf("Size of message is : %d\n", bytesExpected);
 
-			char* myBuffer = (char*)(malloc(bytesExpected)); // alociranje memorije za poruku
+			//char* myBuffer = (char*)(malloc(bytesExpected)); // alociranje memorije za poruku
 
 			int cnt = 0;
 
@@ -148,22 +166,23 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 				cnt += iResult;
 			}
-			return myBuffer;
+			//return myBuffer;
 		}
 		else if (iResult == 0)
 		{
 			// connection was closed gracefully
 			//printf("Connection with client closed.\n");
 			//closesocket(acceptedSocket);
-			return "ErrorC";
+			memcpy(myBuffer, "ErrorC", 7);
 		}
 		else
 		{
 			// there was an error during recv
 			//printf("recv failed with error: %d\n", WSAGetLastError());
 			//closesocket(acceptedSocket);
-			return "ErrorR";
+			memcpy(myBuffer, "ErrorR", 7);
 		}	
+		return(myBuffer);
 		
 }
 

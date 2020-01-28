@@ -26,6 +26,25 @@ void ProcessInputAndGenerateMessage(char input, char* message);
 int SendFunction(SOCKET, char*, int);
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 bool AlreadySubscribed(char, int[], int);
+int Connect(SOCKET);
+
+int Connect(SOCKET connectSocket) {
+	/*char connect[] = "s:Connect";*/
+	char* connect = (char*)malloc(10 * sizeof(char));
+	strcpy(connect, "s:Connect");
+
+	int messageDataSize = strlen(connect) + 1;
+	int messageSize = messageDataSize + sizeof(int);
+
+	MessageStruct* messageStruct = GenerateMessageStruct(connect, messageDataSize);
+
+	int retVal = SendFunction(connectSocket, (char*)messageStruct, messageSize);
+	free(messageStruct);
+	free(connect);
+
+	return retVal;
+
+}
 
 bool AlreadySubscribed(char c, int subscribed[], int numOfSubscribedTopics) {
 	for (int i = 0; i < numOfSubscribedTopics; i++) {
@@ -40,10 +59,12 @@ bool AlreadySubscribed(char c, int subscribed[], int numOfSubscribedTopics) {
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
+	char* myBuffer = (char*)(malloc(DEFAULT_BUFLEN));
 
 	int selectResult = SelectFunction(acceptedSocket, 'r');
 	if (selectResult == -1) {
-		return "ErrorS";
+		memcpy(myBuffer, "ErrorS", 7);
+		return myBuffer;
 	}
 	iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
 
@@ -52,33 +73,36 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 		int bytesExpected = *((int*)recvbuf);
 		//printf("Size of message is : %d\n", bytesExpected);
 
-		char* myBuffer = (char*)(malloc(sizeof(bytesExpected))); // alociranje memorije za poruku
+		//char* myBuffer = (char*)(malloc(bytesExpected)); // alociranje memorije za poruku
 
 		int cnt = 0;
 
 		while (cnt < bytesExpected) {
 
-			int selectResult = SelectFunction(acceptedSocket, 'r');
-			if (selectResult == -1) {
-				return "ErrorS";
-			}
-
+			SelectFunction(acceptedSocket, 'r');
 			iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
 
 			//printf("Message received from client: %s.\n", myBuffer);
 
 			cnt += iResult;
 		}
-		return myBuffer;
+		//return myBuffer;
 	}
 	else if (iResult == 0)
 	{
-		return "ErrorC";
+		// connection was closed gracefully
+		//printf("Connection with client closed.\n");
+		//closesocket(acceptedSocket);
+		memcpy(myBuffer, "ErrorC", 7);
 	}
 	else
 	{
-		return "ErrorR";
+		// there was an error during recv
+		//printf("recv failed with error: %d\n", WSAGetLastError());
+		//closesocket(acceptedSocket);
+		memcpy(myBuffer, "ErrorR", 7);
 	}
+	return myBuffer;
 
 }
 int SendFunction(SOCKET connectSocket, char* message, int messageSize) {

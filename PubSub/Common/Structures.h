@@ -9,7 +9,7 @@
 #define MESSAGE_LEN 250
 
 struct topic_sub {
-	char* topic;
+	char topic[TOPIC_LEN];
 	SOCKET subs_array[NUM_OF_SUBS];
 	int size;
 };
@@ -44,4 +44,5 @@ struct MessageStruct
 struct ThreadArgument {
 	SOCKET socket;
 	int ordinalNumber;
+	int clientNumber;
 };

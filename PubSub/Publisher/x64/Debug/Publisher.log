@@ -1,0 +1,20 @@
+﻿  Client.cpp
+d:\desktop\ikp\pubsub\publisher\publisher.h(36): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+d:\desktop\ikp\pubsub\publisher\client.cpp(21): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+d:\desktop\ikp\pubsub\publisher\client.cpp(36): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+d:\desktop\ikp\pubsub\common\queue.h(147): warning C4715: 'Dequeue': not all control paths return a value
+d:\desktop\ikp\pubsub\publisher\publisher.h(176): warning C4715: 'SelectFunction': not all control paths return a value
+d:\desktop\ikp\pubsub\common\queue.h(162): warning C4715: 'DequeueMessageQueue': not all control paths return a value
+Client.obj : error LNK2019: unresolved external symbol __imp_closesocket referenced in function "unsigned long __cdecl PublisherReceive(void *)" (?PublisherReceive@@YAKPEAX@Z)
+Client.obj : error LNK2019: unresolved external symbol __imp_connect referenced in function main
+Client.obj : error LNK2019: unresolved external symbol __imp_ioctlsocket referenced in function main
+Client.obj : error LNK2019: unresolved external symbol __imp_htons referenced in function main
+Client.obj : error LNK2019: unresolved external symbol __imp_inet_addr referenced in function main
+Client.obj : error LNK2019: unresolved external symbol __imp_recv referenced in function "char * __cdecl ReceiveFunction(unsigned __int64,char *)" (?ReceiveFunction@@YAPEAD_KPEAD@Z)
+Client.obj : error LNK2019: unresolved external symbol __imp_select referenced in function "int __cdecl SelectFunction(unsigned __int64,char)" (?SelectFunction@@YAH_KD@Z)
+Client.obj : error LNK2019: unresolved external symbol __imp_send referenced in function "int __cdecl SendFunction(unsigned __int64,char *,int)" (?SendFunction@@YAH_KPEADH@Z)
+Client.obj : error LNK2019: unresolved external symbol __imp_socket referenced in function main
+Client.obj : error LNK2019: unresolved external symbol __imp_WSAStartup referenced in function "bool __cdecl InitializeWindowsSockets(void)" (?InitializeWindowsSockets@@YA_NXZ)
+Client.obj : error LNK2019: unresolved external symbol __imp_WSACleanup referenced in function "int __cdecl SendFunction(unsigned __int64,char *,int)" (?SendFunction@@YAH_KPEADH@Z)
+Client.obj : error LNK2019: unresolved external symbol __imp_WSAGetLastError referenced in function "bool __cdecl InitializeWindowsSockets(void)" (?InitializeWindowsSockets@@YA_NXZ)
+D:\Desktop\IKP\PubSub\x64\Debug\Publisher.exe : fatal error LNK1120: 12 unresolved externals

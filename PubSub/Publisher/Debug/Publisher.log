@@ -1,9 +1,5 @@
 ﻿  Client.cpp
-d:\desktop\ikp\pubsub\common\queue.h(146): warning C4715: 'Dequeue': not all control paths return a value
-d:\desktop\ikp\pubsub\publisher\publisher.h(152): warning C4715: 'SelectFunction': not all control paths return a value
-d:\desktop\ikp\pubsub\common\queue.h(161): warning C4715: 'DequeueMessageQueue': not all control paths return a value
-d:\desktop\ikp\pubsub\publisher\publisher.h(102): warning C4715: 'ReceiveFunction': not all control paths return a value
-d:\desktop\ikp\pubsub\publisher\publisher.h(87): warning C4172: returning address of local variable or temporary: ret
-d:\desktop\ikp\pubsub\publisher\publisher.h(94): warning C4172: returning address of local variable or temporary: ret
-d:\desktop\ikp\pubsub\publisher\publisher.h(99): warning C4172: returning address of local variable or temporary: ret
+d:\desktop\ikp\pubsub\common\queue.h(162): warning C4715: 'DequeueMessageQueue': not all control paths return a value
+d:\desktop\ikp\pubsub\publisher\publisher.h(176): warning C4715: 'SelectFunction': not all control paths return a value
+d:\desktop\ikp\pubsub\common\queue.h(147): warning C4715: 'Dequeue': not all control paths return a value
   Publisher.vcxproj -> D:\Desktop\IKP\PubSub\Debug\Publisher.exe

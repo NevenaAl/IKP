@@ -8,13 +8,13 @@ DWORD WINAPI PublisherSend(LPVOID lpParam) {
 		PrintMenu();
 		char c = _getch();
 
-		char message[270];
+		char* message = (char*)malloc(270 * sizeof(char));
 
 		if (c == '1' || c == '2' || c == '3' || c == '4' || c == '5') {
 
 			ProcessInput(c, message);
 
-			char publish_message[250];
+			char* publish_message = (char*)malloc(250*sizeof(char));
 
 			EnterAndGenerateMessage(publish_message, message);
 
@@ -23,31 +23,34 @@ DWORD WINAPI PublisherSend(LPVOID lpParam) {
 
 			MessageStruct* messageStructToSend = GenerateMessageStruct(message, messageDataSize);
 			int sendResult = SendFunction(connectSocket, (char*)messageStructToSend, messageSize);
-			//free(messageStructToSend);
+			free(messageStructToSend);
+			free(message);
+			free(publish_message);
 			if (sendResult == -1)
 				break;
 
 			
 		}
 		else if (c == 'x' || c == 'X') {
-			char shutDownMessage[] = "p:shutDown";
-			int messageDataSize = strlen(shutDownMessage) + 1;
+			strcpy(message, "p:shutDown");
+			int messageDataSize = strlen(message) + 1;
 			int messageSize = messageDataSize + sizeof(int);
 
-			MessageStruct* messageStruct = GenerateMessageStruct(shutDownMessage, messageDataSize);
+			MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
 			int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
-			//free(messageStruct);
+			free(messageStruct);
+			free(message);
 			if (sendResult == -1) {
 				break;
 			}
 
 			appRunning = false;
 			closesocket(connectSocket);
-			//free(messageStructToSend);
 			break;
 		}
 		else {
 			printf("Invalid input.\n");
+			free(message);
 			continue;
 		}
 	}
@@ -58,26 +61,25 @@ DWORD WINAPI PublisherReceive(LPVOID lpParam) {
 	int iResult = 0;
 	SOCKET connectSocket = *(SOCKET*)lpParam;
 	char recvbuf[DEFAULT_BUFLEN];
-	char* recvRes = (char*)malloc(DEFAULT_BUFLEN);
 
 	while (appRunning && !serverStopped)
 	{
+		char* recvRes;
+
 		recvRes = ReceiveFunction(connectSocket, recvbuf);
 		//memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
-		 if (!strcmp(recvRes, "ErrorS")) {
-
-			/*free(recvRes);
-			return 1;*/
+	    if (!strcmp(recvRes, "ErrorS")) {
+			 free(recvRes);
 			 break;
 		}
 		else if (!strcmp(recvRes, "ErrorC"))
 		{
-			// connection was closed gracefully
 			printf("\nConnection with server closed.\n");
 			printf("Press any key to close this window . . .");
 			closesocket(connectSocket);
 			appRunning = false;
 			serverStopped = true;
+			free(recvRes);
 			break;
 		}
 		else if (!strcmp(recvRes, "ErrorR"))
@@ -87,13 +89,13 @@ DWORD WINAPI PublisherReceive(LPVOID lpParam) {
 			closesocket(connectSocket);
 			appRunning = false;
 			serverStopped = true;
-			/*free(recvRes);
-			return 1;*/
+			free(recvRes);
 			break;
 		}
+		free(recvRes);
+		
 	}
-	//free(recvRes);
-
+	
 	return 1;
 }
 
@@ -138,17 +140,11 @@ int __cdecl main(int argc, char **argv)
 	}
 
 
-	char connect[] = "p:Connect";
-
-	int messageDataSize = strlen(connect) + 1;
-	int messageSize = messageDataSize + sizeof(int);
-
-	MessageStruct* messageStruct = GenerateMessageStruct(connect, messageDataSize);
-	int sendResult = SendFunction(connectSocket, (char*)messageStruct, messageSize);
-	if (sendResult == -1)
+	int connectResult = Connect(connectSocket);
+	if (connectResult == -1) {
 		serverStopped = true;
-
-
+	}
+		
 	HANDLE publisherSendThread, publisherReceiveThread;
 	DWORD publisherSendID, publisherReceiveID;
 
@@ -170,8 +166,6 @@ int __cdecl main(int argc, char **argv)
 	SAFE_DELETE_HANDLE(publisherReceiveThread);
 	
 	closesocket(connectSocket);
-
-	free(messageStruct);
 
 	WSACleanup();
 
