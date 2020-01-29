@@ -28,6 +28,11 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
 bool AlreadySubscribed(char, int[], int);
 int Connect(SOCKET);
 
+///<summary>
+/// Sending connection message to server.
+///</summary>
+///<param name ="connectSocket">Connected socket.</param>
+///<returns>Return value of Send function(indicating error).</returns>
 int Connect(SOCKET connectSocket) {
 	/*char connect[] = "s:Connect";*/
 	char* connect = (char*)malloc(10 * sizeof(char));
@@ -46,6 +51,13 @@ int Connect(SOCKET connectSocket) {
 
 }
 
+///<summary>
+/// Checks if subscriber is already subscribed to certain topic.
+///</summary>
+///<param name ="c">Client's input.</param>
+///<param name ="subscribed">Array of topics client is subscribed to.</param>
+///<param name ="numOfSubscribedTopics">Number of topics client is subscribed to.</param>
+///<returns>Returns true if client is subscribed to topic, otherwise false.</returns>
 bool AlreadySubscribed(char c, int subscribed[], int numOfSubscribedTopics) {
 	for (int i = 0; i < numOfSubscribedTopics; i++) {
 		if (subscribed[i] == c - '0') {
@@ -55,7 +67,12 @@ bool AlreadySubscribed(char c, int subscribed[], int numOfSubscribedTopics) {
 	return false;
 }
 
-
+///<summary>
+/// Receives a message through socket. Made for making sure the whole message has been received.
+///</summary>
+///<param name ="acceptedSocket">Socket for receiving message.</param>
+///<param name ="recvbuf">Buffer to receive message.</param>
+///<returns>Received message. Eror type in case of error.</returns>
 char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 
 	int iResult;
@@ -105,6 +122,14 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 	return myBuffer;
 
 }
+
+///<summary>
+/// Sends a message through socket. Made for making sure the whole message has been sent.
+///</summary>
+///<param name ="connectSocket">Socket for sending message.</param>
+///<param name ="message">Message to send.</param>
+///<param name ="messageSize">Size of a message.</param>
+///<returns>Return value of Select function if select is impossible, otherwise 0 or 1.</returns>
 int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
 	int selectResult = SelectFunction(connectSocket, 'w');
@@ -135,6 +160,13 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 	//printf("Bytes Sent: %ld\n", iResult);
 }
 
+///<summary>
+/// Select function used in nonblocking mode.
+/// Waits until send or receive is possible.
+///</summary>
+///<param name ="lisenSocket">Socket put in FD_SET.</param>
+///<param name ="rw">Char used to inform wich mode is used(read or write).</param>
+///<returns>Returns -1 if server closed connection.</returns>
 int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
 	while(true) {

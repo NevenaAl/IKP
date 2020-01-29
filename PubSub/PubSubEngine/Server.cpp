@@ -20,6 +20,13 @@ DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
 HANDLE PublisherThreads[NUMBER_OF_CLIENTS];
 DWORD PublisherThreadsID[NUMBER_OF_CLIENTS];
 
+
+///<summary>
+/// A function executing in thread created and run at the beginning of the main program.
+/// It is used for checking if thread is killed and closing its handle.
+///</summary>
+///<param name ="lpParam"></param>
+///<returns>No return value.</returns>
 DWORD WINAPI CloseHandles(LPVOID lpParam) {
 	while (serverRunning) {
 		if (publisherThreadKilled != -1) {
@@ -76,7 +83,7 @@ DWORD WINAPI GetChar(LPVOID lpParam)
 					 iResult = shutdown(acceptedSockets[i], SD_BOTH);
 					 if (iResult == SOCKET_ERROR)
 					 {
-						 printf("shutdown failed with error: %d\n", WSAGetLastError());
+						 printf("\nshutdown failed with error: %d\n", WSAGetLastError());
 						 closesocket(acceptedSockets[i]);
 						 WSACleanup();
 						 return 1;
@@ -165,7 +172,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		char *topic = ptr;
 		ptr = strtok(NULL, &delimiter);
 		if (!strcmp(topic, "shutDown")) {
-			printf("Subscriber %d disconnected.\n", argumentStructure.ordinalNumber);
+			printf("\nSubscriber %d disconnected.\n", argumentStructure.ordinalNumber);
 			SubscriberShutDown(queue, argumentStructure.socket, subscribers);
 			subscriberRunning = false;
 			acceptedSockets[argumentStructure.clientNumber] = -1;
@@ -186,7 +193,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			EnterCriticalSection(&queueAccess);
 			Subscribe(queue, argumentStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.ordinalNumber, topic);
+			printf("\nSubscriber %d subscribed to topic: %s. \n", argumentStructure.ordinalNumber, topic);
 			free(recvRes);
 		}
 	}
@@ -196,13 +203,13 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	}
 	else if (!strcmp(recvRes, "ErrorC"))
 	{
-			printf("Connection with client closed.\n");
+			printf("\nConnection with client closed.\n");
 			closesocket(argumentStructure.socket);
 			free(recvRes);
 	}
 	else if (!strcmp(recvRes, "ErrorR"))
 	{
-			printf("recv failed with error: %d\n", WSAGetLastError());
+			printf("\nrecv failed with error: %d\n", WSAGetLastError());
 			closesocket(argumentStructure.socket);
 			free(recvRes);
 
@@ -224,7 +231,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			char *topic = ptr;
 			ptr = strtok(NULL, &delimiter);
 			if (!strcmp(topic, "shutDown")) {
-				printf("Subscriber %d disconnected.\n",argumentStructure.ordinalNumber);
+				printf("\nSubscriber %d disconnected.\n",argumentStructure.ordinalNumber);
 				SubscriberShutDown(queue, argumentStructure.socket, subscribers);
 				subscriberRunning = false;
 				acceptedSockets[argumentStructure.clientNumber] = -1;
@@ -235,7 +242,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			EnterCriticalSection(&queueAccess);
 			Subscribe(queue, argumentStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			printf("Subscriber %d subscribed to topic: %s. \n", argumentStructure.ordinalNumber, topic);
+			printf("\nSubscriber %d subscribed to topic: %s.\n", argumentStructure.ordinalNumber, topic);
 			free(recvRes);
 
 		}
@@ -246,7 +253,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		else if (!strcmp(recvRes, "ErrorC"))
 		{
 			// connection was closed gracefully
-			printf("Connection with client closed.\n");
+			printf("\nConnection with client closed.\n");
 			closesocket(argumentStructure.socket);
 			free(recvRes);
 			break;
@@ -254,7 +261,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		else if (!strcmp(recvRes, "ErrorR"))
 		{
 			// there was an error during recv
-			printf("recv failed with error: %d\n", WSAGetLastError());
+			printf("\nrecv failed with error: %d\n", WSAGetLastError());
 			closesocket(argumentStructure.socket);
 			free(recvRes);
 			break;
@@ -339,7 +346,7 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 
 			if (!strcmp(role, "p")) {
 				if (!strcmp(topic, "shutDown")) {
-					printf("Publisher %d disconnected.\n", argumentStructure.ordinalNumber);
+					printf("\nPublisher %d disconnected.\n", argumentStructure.ordinalNumber);
 					acceptedSockets[argumentStructure.clientNumber] = -1;
 					break;
 				}
@@ -360,14 +367,14 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 		else if (!strcmp(recvRes, "ErrorC"))
 		{
 			// connection was closed gracefully
-			printf("Connection with client closed.\n");
+			printf("\nConnection with client closed.\n");
 			closesocket(argumentStructure.socket);
 			break;
 		}
 		else if (!strcmp(recvRes, "ErrorR"))
 		{
 			// there was an error during recv
-			printf("recv failed with error: %d\n", WSAGetLastError());
+			printf("\nrecv failed with error: %d\n", WSAGetLastError());
 			closesocket(argumentStructure.socket);
 			break;
 
@@ -427,7 +434,7 @@ int  main(void)
 	iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &resultingAddress);
 	if (iResult != 0)
 	{
-		printf("getaddrinfo failed with error: %d\n", iResult);
+		printf("\ngetaddrinfo failed with error: %d\n", iResult);
 		WSACleanup();
 		return 1;
 	}
@@ -439,7 +446,7 @@ int  main(void)
 
 	if (listenSocket == INVALID_SOCKET)
 	{
-		printf("socket failed with error: %ld\n", WSAGetLastError());
+		printf("\nsocket failed with error: %ld\n", WSAGetLastError());
 		freeaddrinfo(resultingAddress);
 		WSACleanup();
 		return 1;
@@ -450,7 +457,7 @@ int  main(void)
 	iResult = bind(listenSocket, resultingAddress->ai_addr, (int)resultingAddress->ai_addrlen);
 	if (iResult == SOCKET_ERROR)
 	{
-		printf("bind failed with error: %d\n", WSAGetLastError());
+		printf("\nbind failed with error: %d\n", WSAGetLastError());
 		freeaddrinfo(resultingAddress);
 		closesocket(listenSocket);
 		WSACleanup();
@@ -463,7 +470,7 @@ int  main(void)
 
 	if (iResult == SOCKET_ERROR)
 	{
-		printf("ioctlsocket failed with error: %ld\n", WSAGetLastError());
+		printf("\nioctlsocket failed with error: %ld\n", WSAGetLastError());
 		return 1;
 	}
 	//NEW
@@ -475,20 +482,19 @@ int  main(void)
 	iResult = listen(listenSocket, SOMAXCONN);
 	if (iResult == SOCKET_ERROR)
 	{
-		printf("listen failed with error: %d\n", WSAGetLastError());
+		printf("\nlisten failed with error: %d\n", WSAGetLastError());
 		closesocket(listenSocket);
 		WSACleanup();
 		return 1;
 	}
 
-	printf("Server initialized, waiting for clients.\n");
+	printf("\nServer initialized, waiting for clients.\n");
 
 	pubSubThread = CreateThread(NULL, 0, &PubSubWork, NULL, 0, &pubSubThreadID);
 	exitThread = CreateThread(NULL, 0, &GetChar, &listenSocket, 0, &exitThreadID);
 	closeHandlesThread = CreateThread(NULL, 0, &CloseHandles, NULL, 0, &closeHandlesThreadID);
 
 
-	//printf("Press X if you want to close server.\n");
 	while (clientsCount < NUMBER_OF_CLIENTS && serverRunning)
 	{
 		int selectResult = SelectFunction(listenSocket, 'r');
@@ -500,7 +506,7 @@ int  main(void)
 
 		if (acceptedSockets[clientsCount] == INVALID_SOCKET)
 		{
-			printf("accept failed with error: %d\n", WSAGetLastError());
+			printf("\naccept failed with error: %d\n", WSAGetLastError());
 			closesocket(listenSocket);
 			WSACleanup();
 			return 1;
@@ -540,11 +546,12 @@ int  main(void)
 	if (exitThread) {
 		WaitForSingleObject(exitThread, INFINITE);
 	}
+
 	if (closeHandlesThread) {
 		WaitForSingleObject(closeHandlesThread, INFINITE);
 	}
 
-	printf("Server shutting down.");
+	printf("\nServer shutting down.\n");
 
 	DeleteCriticalSection(&queueAccess);
 	DeleteCriticalSection(&message_queueAccess);
@@ -568,7 +575,7 @@ int  main(void)
 			iResult = shutdown(acceptedSockets[i], SD_SEND);
 			if (iResult == SOCKET_ERROR)
 			{
-				printf("shutdown failed with error: %d\n", WSAGetLastError());
+				printf("\nshutdown failed with error: %d\n", WSAGetLastError());
 				closesocket(acceptedSockets[clientsCount]);
 				WSACleanup();
 				return 1;

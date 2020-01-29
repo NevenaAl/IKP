@@ -16,6 +16,7 @@
 bool serverRunning = true;
 int clientsCount = 0;
 int numberOfPublishers = 0;
+int numberOfPublishers = 0;
 int numberOfSubscribers = 0;
 ThreadArgument publisherThreadArgument;
 ThreadArgument subscriberThreadArgument;
@@ -29,6 +30,13 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize);
 char Connect(SOCKET);
 void AddTopics(Queue*);
 
+
+
+///<summary>
+/// Adds toppics to queue.
+///</summary>
+///<param name ="queue">Pointer to queue.</param>
+///<returns>No return value.</returns>
 void AddTopics(Queue* queue) {
 
 	Enqueue(queue, "Sport");
@@ -38,6 +46,11 @@ void AddTopics(Queue* queue) {
 	Enqueue(queue, "Show business");
 }
 
+///<summary>
+/// Receiving connection message from clients. 
+///</summary>
+///<param name ="acceptedSocket">Accepted socket.</param>
+///<returns>Type of connected client('p' or 's').</returns>
 char Connect(SOCKET acceptedSocket) {
 	char recvbuf[DEFAULT_BUFLEN];
 	char *recvRes;
@@ -58,7 +71,7 @@ char Connect(SOCKET acceptedSocket) {
 			subscriberThreadArgument.socket = acceptedSocket;
 			subscriberThreadArgument.clientNumber = clientsCount;
 			//SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
-			printf("Subscriber %d connected.\n", numberOfSubscribers);
+			printf("\nSubscriber %d connected.\n", numberOfSubscribers);
 			
 			free(recvRes);
 			return 's';
@@ -69,7 +82,7 @@ char Connect(SOCKET acceptedSocket) {
 			publisherThreadArgument.socket = acceptedSocket;
 			publisherThreadArgument.clientNumber = clientsCount;
 			//PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSocket, 0, &PublisherThreadsID[numberOfPublishers]);
-			printf("Publisher %d connected.\n", numberOfPublishers);
+			printf("\nPublisher %d connected.\n", numberOfPublishers);
 			
 			free(recvRes);
 			return 'p';
@@ -79,13 +92,13 @@ char Connect(SOCKET acceptedSocket) {
 	else if (!strcmp(recvRes, "ErrorC"))
 	{
 		// connection was closed gracefully
-		printf("Connection with client closed.\n");
+		printf("\nConnection with client closed.\n");
 		closesocket(acceptedSocket);
 	}
 	else if (!strcmp(recvRes, "ErrorR"))
 	{
 		// there was an error during recv
-		printf("recv failed with error: %d\n", WSAGetLastError());
+		printf("\nrecv failed with error: %d\n", WSAGetLastError());
 		closesocket(acceptedSocket);
 	}
 	free(recvRes);
@@ -99,7 +112,7 @@ char Connect(SOCKET acceptedSocket) {
 ///<param name ="connectSocket">Socket for sending message.</param>
 ///<param name ="message">Message to send.</param>
 ///<param name ="messageSize">Size of a message.</param>
-///<returns>No return value.</returns>
+///<returns>Return value of Select function if select is impossible, otherwise 0 or 1.</returns>
 int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
 	int selectResult = SelectFunction(connectSocket, 'w');
@@ -110,7 +123,7 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 
 	if (iResult == SOCKET_ERROR)
 	{
-		printf("send failed with error: %d\n", WSAGetLastError());
+		printf("\nsend failed with error: %d\n", WSAGetLastError());
 		closesocket(connectSocket);
 		WSACleanup();
 		return 0;
@@ -269,7 +282,7 @@ void Publish(struct MessageQueue* message_queue, char* topic, char* message,int 
 ///</summary>
 ///<param name ="lisenSocket">Socket put in FD_SET.</param>
 ///<param name ="rw">Char used to inform wich mode is used(read or write).</param>
-///<returns>No return value.</returns>
+///<returns>Returns -1 if server closed connection.</returns>
 int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
 	do {
@@ -296,7 +309,7 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 
 		if (iResult == SOCKET_ERROR)
 		{
-			fprintf(stderr, "select failed with error: %ld\n", WSAGetLastError());
+			fprintf(stderr, "\nselect failed with error: %ld\n", WSAGetLastError());
 			continue;
 		}
 
