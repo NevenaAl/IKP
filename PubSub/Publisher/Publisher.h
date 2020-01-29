@@ -21,6 +21,7 @@ bool serverStopped = false;
 bool appRunning = true;
 
 void EnterAndGenerateMessage(char* publish_message, char* message);
+bool ValidateMessage(char* publish_message);
 int SelectFunction(SOCKET, char);
 void PrintMenu();
 void ProcessInput(char input, char* message);
@@ -28,6 +29,21 @@ int SendFunction(SOCKET,char*,int);
 char* ReceiveFunction(SOCKET, char*);
 int Connect(SOCKET);
 
+bool ValidateMessage(char* publish_message) {
+	if (!strcmp(publish_message, "\n")) {
+		return false;
+	}
+	
+	int messageLength = strlen(publish_message);
+
+	for (int i = 0; i < messageLength - 1; i++)
+	{
+		if (publish_message[i] != ' ' && publish_message[i] != '\t') {
+			return true;
+		}
+	}
+	return false;
+}
 
 ///<summary>
 /// Sending connection message to server.
@@ -102,6 +118,14 @@ void EnterAndGenerateMessage(char* publish_message, char* message)
 	
 	//scanf("%249s", publish_message);
 	fgets(publish_message, MAX_MESSAGE_SIZE, stdin);
+
+	while (!ValidateMessage(publish_message)) {
+
+		printf("Message cannot be empty. Please enter your message again: \n");
+		fgets(publish_message, MAX_MESSAGE_SIZE, stdin);
+	}
+
+
 	if (strchr(publish_message, '\n') == NULL) {
 		int c;
 		while ((c = fgetc(stdin)) != '\n' && c != EOF);

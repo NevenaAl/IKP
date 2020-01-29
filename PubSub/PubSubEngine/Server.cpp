@@ -5,7 +5,8 @@ CRITICAL_SECTION message_queueAccess;
 
 HANDLE pubSubSemaphore;
 int publisherThreadKilled = -1;
-int subscriberThreadKilled = -1;
+int subscriberSendThreadKilled = -1;
+int subscriberRecvThreadKilled = -1;
 SOCKET acceptedSockets[NUMBER_OF_CLIENTS];
 
 struct Queue* queue = CreateQueue(10);
@@ -14,8 +15,11 @@ struct topic_message current;
 struct Subscriber subscribers[20];
 
 
-HANDLE SubscriberThreads[NUMBER_OF_CLIENTS];
-DWORD SubscriberThreadsID[NUMBER_OF_CLIENTS];
+HANDLE SubscriberSendThreads[NUMBER_OF_CLIENTS];
+DWORD SubscriberSendThreadsID[NUMBER_OF_CLIENTS];
+
+HANDLE SubscriberRecvThreads[NUMBER_OF_CLIENTS];
+DWORD SubscriberRecvThreadsID[NUMBER_OF_CLIENTS];
 
 HANDLE PublisherThreads[NUMBER_OF_CLIENTS];
 DWORD PublisherThreadsID[NUMBER_OF_CLIENTS];
@@ -43,12 +47,24 @@ DWORD WINAPI CloseHandles(LPVOID lpParam) {
 			}
 				
 		}
-		if (subscriberThreadKilled != -1) {
-			for (int i = 0; i < numberOfSubscribers; i++) {
-				if (subscriberThreadKilled == i) {
-					SAFE_DELETE_HANDLE(SubscriberThreads[i]);
-					SubscriberThreads[i] = 0;
-					subscriberThreadKilled = -1;
+		if (subscriberSendThreadKilled != -1) {
+			for (int i = 0; i < numberOfSubscribedSubs; i++) {
+				if (subscriberSendThreadKilled == i) {
+					SAFE_DELETE_HANDLE(SubscriberSendThreads[i]);
+					SubscriberSendThreads[i] = 0;
+					subscriberSendThreadKilled = -1;
+
+				}
+			}
+
+		}
+
+		if (subscriberRecvThreadKilled != -1) {
+			for (int i = 0; i < numberOfConnectedSubs; i++) {
+				if (subscriberRecvThreadKilled == i) {
+					SAFE_DELETE_HANDLE(SubscriberRecvThreads[i]);
+					SubscriberRecvThreads[i] = 0;
+					subscriberRecvThreadKilled = -1;
 
 				}
 			}
@@ -141,7 +157,7 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 		if (sendResult == -1)
 			break;
 	}
-	subscriberThreadKilled = argumentStructure.ordinalNumber;
+	subscriberSendThreadKilled = argumentStructure.ordinalNumber;
 	return 1;
 }
 
@@ -154,12 +170,15 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 ///<returns>No return value.</returns>
 DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	char recvbuf[DEFAULT_BUFLEN];
-	ThreadArgument argumentStructure = *(ThreadArgument*)lpParam;
+	ThreadArgument argumentRecvStructure = *(ThreadArgument*)lpParam;
+	ThreadArgument argumentSendStructure = argumentRecvStructure;
+	argumentSendStructure.ordinalNumber = numberOfSubscribedSubs;
+
 	bool subscriberRunning = true;
 	char* recvRes;
 
 	//memcpy(recvbuf,ReceiveFunction(argumentStructure.socket, recvbuf), DEFAULT_BUFLEN);
-	recvRes = ReceiveFunction(argumentStructure.socket, recvbuf);
+	recvRes = ReceiveFunction(argumentSendStructure.socket, recvbuf);
 
 	if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 	{
@@ -172,28 +191,29 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		char *topic = ptr;
 		ptr = strtok(NULL, &delimiter);
 		if (!strcmp(topic, "shutDown")) {
-			printf("\nSubscriber %d disconnected.\n", argumentStructure.ordinalNumber);
-			SubscriberShutDown(queue, argumentStructure.socket, subscribers);
+			printf("\nSubscriber %d disconnected.\n", argumentSendStructure.ordinalNumber);
+			SubscriberShutDown(queue, argumentSendStructure.socket, subscribers);
 			subscriberRunning = false;
-			acceptedSockets[argumentStructure.clientNumber] = -1;
+			acceptedSockets[argumentSendStructure.clientNumber] = -1;
 			free(recvRes);
-			subscriberThreadKilled = argumentStructure.ordinalNumber;
+			subscriberRecvThreadKilled = argumentSendStructure.ordinalNumber;
 			return 1;
 		}
 		else {
 			HANDLE hSem = CreateSemaphore(0, 0, 1, NULL);
 
 			struct Subscriber subscriber;
-			subscriber.sendTo = argumentStructure.socket;
+			subscriber.sendTo = argumentSendStructure.socket;
 			subscriber.hSemaphore = hSem;
-			subscribers[argumentStructure.ordinalNumber] = subscriber;
+			subscribers[argumentSendStructure.ordinalNumber] = subscriber;
 
-			SubscriberThreads[argumentStructure.ordinalNumber] = CreateThread(NULL, 0, &SubscriberWork, &argumentStructure, 0, &SubscriberThreadsID[argumentStructure.ordinalNumber]);
+			SubscriberSendThreads[numberOfSubscribedSubs] = CreateThread(NULL, 0, &SubscriberWork, &argumentSendStructure, 0, &SubscriberSendThreadsID[numberOfSubscribedSubs]);
+			numberOfSubscribedSubs++;
 
 			EnterCriticalSection(&queueAccess);
-			Subscribe(queue, argumentStructure.socket, topic);
+			Subscribe(queue, argumentSendStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			printf("\nSubscriber %d subscribed to topic: %s. \n", argumentStructure.ordinalNumber, topic);
+			printf("\nSubscriber %d subscribed to topic: %s. \n", argumentSendStructure.ordinalNumber, topic);
 			free(recvRes);
 		}
 	}
@@ -204,13 +224,13 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	else if (!strcmp(recvRes, "ErrorC"))
 	{
 			printf("\nConnection with client closed.\n");
-			closesocket(argumentStructure.socket);
+			closesocket(argumentSendStructure.socket);
 			free(recvRes);
 	}
 	else if (!strcmp(recvRes, "ErrorR"))
 	{
 			printf("\nrecv failed with error: %d\n", WSAGetLastError());
-			closesocket(argumentStructure.socket);
+			closesocket(argumentSendStructure.socket);
 			free(recvRes);
 
 	}
@@ -218,7 +238,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	while (subscriberRunning && serverRunning) {
 
 		//memcpy(recvbuf, ReceiveFunction(argumentStructure.socket, recvbuf), DEFAULT_BUFLEN);;
-		recvRes = ReceiveFunction(argumentStructure.socket, recvbuf);
+		recvRes = ReceiveFunction(argumentSendStructure.socket, recvbuf);
 
 		if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 		{
@@ -231,18 +251,18 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			char *topic = ptr;
 			ptr = strtok(NULL, &delimiter);
 			if (!strcmp(topic, "shutDown")) {
-				printf("\nSubscriber %d disconnected.\n",argumentStructure.ordinalNumber);
-				SubscriberShutDown(queue, argumentStructure.socket, subscribers);
+				printf("\nSubscriber %d disconnected.\n", argumentSendStructure.ordinalNumber);
+				SubscriberShutDown(queue, argumentSendStructure.socket, subscribers);
 				subscriberRunning = false;
-				acceptedSockets[argumentStructure.clientNumber] = -1;
+				acceptedSockets[argumentSendStructure.clientNumber] = -1;
 				free(recvRes);
 				break;
 			}
 			
 			EnterCriticalSection(&queueAccess);
-			Subscribe(queue, argumentStructure.socket, topic);
+			Subscribe(queue, argumentSendStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			printf("\nSubscriber %d subscribed to topic: %s.\n", argumentStructure.ordinalNumber, topic);
+			printf("\nSubscriber %d subscribed to topic: %s.\n", argumentSendStructure.ordinalNumber, topic);
 			free(recvRes);
 
 		}
@@ -254,7 +274,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		{
 			// connection was closed gracefully
 			printf("\nConnection with client closed.\n");
-			closesocket(argumentStructure.socket);
+			closesocket(argumentSendStructure.socket);
 			free(recvRes);
 			break;
 		}
@@ -262,13 +282,13 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		{
 			// there was an error during recv
 			printf("\nrecv failed with error: %d\n", WSAGetLastError());
-			closesocket(argumentStructure.socket);
+			closesocket(argumentSendStructure.socket);
 			free(recvRes);
 			break;
 
 		}
 	}
-	subscriberThreadKilled = argumentStructure.ordinalNumber;
+	subscriberRecvThreadKilled = argumentSendStructure.ordinalNumber;
 	return 1;
 }
 
@@ -514,8 +534,8 @@ int  main(void)
 
 		char clientType = Connect(acceptedSockets[clientsCount]);
 		if (clientType=='s') {
-			SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &subscriberThreadArgument, 0, &SubscriberThreadsID[numberOfSubscribers]);
-			numberOfSubscribers++;
+			SubscriberRecvThreads[numberOfConnectedSubs] = CreateThread(NULL, 0, &SubscriberReceive, &subscriberThreadArgument, 0, &SubscriberRecvThreadsID[numberOfConnectedSubs]);
+			numberOfConnectedSubs++;
 		}
 		else {
 			PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &publisherThreadArgument, 0, &PublisherThreadsID[numberOfPublishers]);
@@ -533,10 +553,16 @@ int  main(void)
 			WaitForSingleObject(PublisherThreads[i], INFINITE);
 	}
 
-	for (int i = 0; i < numberOfSubscribers; i++) {
+	for (int i = 0; i < numberOfConnectedSubs; i++) {
 
-		if (SubscriberThreads[i])
-			WaitForSingleObject(SubscriberThreads[i], INFINITE);
+		if (SubscriberRecvThreads[i])
+			WaitForSingleObject(SubscriberRecvThreads[i], INFINITE);
+	}
+
+	for (int i = 0; i < numberOfSubscribedSubs; i++) {
+
+		if (SubscriberSendThreads[i])
+			WaitForSingleObject(SubscriberSendThreads[i], INFINITE);
 	}
 	 
 	if (pubSubThread) {
@@ -560,8 +586,12 @@ int  main(void)
 		SAFE_DELETE_HANDLE(PublisherThreads[i]);
 	}
 
-	for (int i = 0; i < numberOfSubscribers; i++) {
-		SAFE_DELETE_HANDLE(SubscriberThreads[i]);
+	for (int i = 0; i < numberOfConnectedSubs; i++) {
+		SAFE_DELETE_HANDLE(SubscriberRecvThreads[i]);
+	}
+
+	for (int i = 0; i < numberOfSubscribedSubs; i++) {
+		SAFE_DELETE_HANDLE(SubscriberSendThreads[i]);
 	}
 
 	SAFE_DELETE_HANDLE(pubSubThread);

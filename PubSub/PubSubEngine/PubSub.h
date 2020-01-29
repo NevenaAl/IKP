@@ -16,8 +16,9 @@
 bool serverRunning = true;
 int clientsCount = 0;
 int numberOfPublishers = 0;
-int numberOfPublishers = 0;
-int numberOfSubscribers = 0;
+
+int numberOfConnectedSubs = 0;
+int numberOfSubscribedSubs = 0;
 ThreadArgument publisherThreadArgument;
 ThreadArgument subscriberThreadArgument;
 
@@ -67,11 +68,11 @@ char Connect(SOCKET acceptedSocket) {
 
 		if (!strcmp(role, "s")) {
 			
-			subscriberThreadArgument.ordinalNumber = numberOfSubscribers;
+			subscriberThreadArgument.ordinalNumber = numberOfConnectedSubs;
 			subscriberThreadArgument.socket = acceptedSocket;
 			subscriberThreadArgument.clientNumber = clientsCount;
 			//SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
-			printf("\nSubscriber %d connected.\n", numberOfSubscribers);
+			printf("\nSubscriber %d connected.\n", numberOfConnectedSubs);
 			
 			free(recvRes);
 			return 's';
