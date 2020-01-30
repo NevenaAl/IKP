@@ -88,14 +88,14 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		//memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
 		if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 		{
-			//char delimiter[] = ":";
-			char delimiter = ':';
-			char *ptr = strtok(recvRes, &delimiter);
+			char delimiter[] = ":";
+			//char delimiter = ':';
+			char *ptr = strtok(recvRes, delimiter);
 
 			char *topic = ptr;
-			ptr = strtok(NULL, &delimiter);
+			ptr = strtok(NULL, delimiter);
 			char *message = ptr;
-			ptr = strtok(NULL, &delimiter);
+			ptr = strtok(NULL, delimiter);
 
 			printf("\nNew message: %s on topic: %s\n", message, topic);
 

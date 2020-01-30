@@ -9,8 +9,8 @@ int subscriberSendThreadKilled = -1;
 int subscriberRecvThreadKilled = -1;
 SOCKET acceptedSockets[NUMBER_OF_CLIENTS];
 
-struct Queue* queue = CreateQueue(10);
-struct MessageQueue* message_queue = CreateMessageQueue(10);
+struct Queue* queue;
+struct MessageQueue* message_queue;
 struct topic_message current;
 struct Subscriber subscribers[20];
 
@@ -150,7 +150,7 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 
 		MessageStruct* messageStruct = GenerateMessageStruct(message, messageDataSize);
 		int sendResult = SendFunction(argumentStructure.socket, (char*)messageStruct, messageSize);
-
+		
 		free(message);
 		free(messageStruct);
 
@@ -180,16 +180,16 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	//memcpy(recvbuf,ReceiveFunction(argumentStructure.socket, recvbuf), DEFAULT_BUFLEN);
 	recvRes = ReceiveFunction(argumentSendStructure.socket, recvbuf);
 
-	if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
+ 	if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 	{
-		//char delimiter[] = ":";
-		char delimiter = ':';
-		char *ptr = strtok(recvRes, &delimiter);
+		char delimiter[] = ":";
+		//char delimiter = ':';
+		char *ptr = strtok(recvRes, delimiter);
 
 		char *role = ptr;
-		ptr = strtok(NULL, &delimiter);
+		ptr = strtok(NULL, delimiter);
 		char *topic = ptr;
-		ptr = strtok(NULL, &delimiter);
+		ptr = strtok(NULL, delimiter);
 		if (!strcmp(topic, "shutDown")) {
 			printf("\nSubscriber %d disconnected.\n", argumentSendStructure.ordinalNumber);
 			SubscriberShutDown(queue, argumentSendStructure.socket, subscribers);
@@ -242,14 +242,14 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 
 		if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 		{
-			//char delimiter[] = ":";
-			char delimiter = ':';
-			char *ptr = strtok(recvRes, &delimiter);
+			char delimiter[] = ":";
+			//char delimiter = ':';
+			char *ptr = strtok(recvRes, delimiter);
 
 			char *role = ptr;
-			ptr = strtok(NULL, &delimiter);
+			ptr = strtok(NULL, delimiter);
 			char *topic = ptr;
-			ptr = strtok(NULL, &delimiter);
+			ptr = strtok(NULL, delimiter);
 			if (!strcmp(topic, "shutDown")) {
 				printf("\nSubscriber %d disconnected.\n", argumentSendStructure.ordinalNumber);
 				SubscriberShutDown(queue, argumentSendStructure.socket, subscribers);
@@ -354,14 +354,14 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 		recvRes = ReceiveFunction(argumentStructure.socket, recvbuf);
 		if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 		{
-			//char delimiter[] = ":";
-			char delimiter = ':';
-			char *ptr = strtok(recvRes, &delimiter);
+			char delimiter[] = ":";
+			//char delimiter = ':';
+			char *ptr = strtok(recvRes, delimiter);
 
 			char *role = ptr;
-			ptr = strtok(NULL, &delimiter);
+			ptr = strtok(NULL, delimiter);
 			char *topic = ptr;
-			ptr = strtok(NULL, &delimiter);
+			ptr = strtok(NULL, delimiter);
 			char *message = ptr;
 
 			if (!strcmp(role, "p")) {
@@ -371,7 +371,7 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 					break;
 				}
 				else {
-					ptr = strtok(NULL, &delimiter);
+					ptr = strtok(NULL, delimiter);
 					EnterCriticalSection(&message_queueAccess);
 					Publish(message_queue, topic, message, argumentStructure.ordinalNumber);
 					LeaveCriticalSection(&message_queueAccess);
@@ -408,6 +408,9 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 
 int  main(void)
 {
+	queue = CreateQueue(10);
+	message_queue = CreateMessageQueue(1000);
+
 	AddTopics(queue);
 
 	InitializeCriticalSection(&queueAccess);

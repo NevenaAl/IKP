@@ -60,6 +60,9 @@ DWORD WINAPI PublisherSend(LPVOID lpParam) {
 			free(message);
 			continue;
 		}
+
+		
+
 	}
 	return 1;
 }

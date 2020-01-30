@@ -59,12 +59,12 @@ char Connect(SOCKET acceptedSocket) {
 	recvRes = ReceiveFunction(acceptedSocket, recvbuf);
 	if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR"))
 	{
-		//char delimiter[] = ":";
-		char delimiter = ':';
-		char *ptr = strtok(recvRes, &delimiter);
+		char delimiter[] = ":";
+		//char delimiter = ':';
+		char *ptr = strtok(recvRes, delimiter);
 
 		char *role = ptr;
-		ptr = strtok(NULL, &delimiter);
+		ptr = strtok(NULL, delimiter);
 
 		if (!strcmp(role, "s")) {
 			
