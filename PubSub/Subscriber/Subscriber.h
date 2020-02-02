@@ -17,14 +17,13 @@
 #define SERVER_SLEEP_TIME 50
 
 
-bool recvPossible = true;
-bool sendPossible = true;
+bool appRunning = true;
 
 int SelectFunction(SOCKET, char);
 void PrintMenu();
-void ProcessInputAndGenerateMessage(char input, char* message);
+void ProcessInputAndGenerateMessage(char, char* );
 int SendFunction(SOCKET, char*, int);
-char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
+char* ReceiveFunction(SOCKET, char* );
 bool AlreadySubscribed(char, int[], int);
 int Connect(SOCKET);
 
@@ -34,18 +33,17 @@ int Connect(SOCKET);
 ///<param name ="connectSocket">Connected socket.</param>
 ///<returns>Return value of Send function(indicating error).</returns>
 int Connect(SOCKET connectSocket) {
-	/*char connect[] = "s:Connect";*/
-	char* connect = (char*)malloc(10 * sizeof(char));
-	strcpy(connect, "s:Connect");
+	char* connectMessage = (char*)malloc(10 * sizeof(char));
+	strcpy(connectMessage, "s:Connect");
 
-	int messageDataSize = strlen(connect) + 1;
+	int messageDataSize = strlen(connectMessage) + 1;
 	int messageSize = messageDataSize + sizeof(int);
 
-	MessageStruct* messageStruct = GenerateMessageStruct(connect, messageDataSize);
+	MessageStruct* messageStruct = GenerateMessageStruct(connectMessage, messageDataSize);
 
 	int retVal = SendFunction(connectSocket, (char*)messageStruct, messageSize);
 	free(messageStruct);
-	free(connect);
+	free(connectMessage);
 
 	return retVal;
 
@@ -83,40 +81,28 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 		memcpy(myBuffer, "ErrorS", 7);
 		return myBuffer;
 	}
-	iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
+	iResult = recv(acceptedSocket, recvbuf, 4, 0); 
 
 	if (iResult > 0)
 	{
 		int bytesExpected = *((int*)recvbuf);
-		//printf("Size of message is : %d\n", bytesExpected);
 
-		//char* myBuffer = (char*)(malloc(bytesExpected)); // alociranje memorije za poruku
+		int recvBytes = 0;
 
-		int cnt = 0;
-
-		while (cnt < bytesExpected) {
+		while (recvBytes < bytesExpected) {
 
 			SelectFunction(acceptedSocket, 'r');
-			iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
+			iResult = recv(acceptedSocket, myBuffer + recvBytes, bytesExpected - recvBytes, 0);
 
-			//printf("Message received from client: %s.\n", myBuffer);
-
-			cnt += iResult;
+			recvBytes += iResult;
 		}
-		//return myBuffer;
 	}
 	else if (iResult == 0)
 	{
-		// connection was closed gracefully
-		//printf("Connection with client closed.\n");
-		//closesocket(acceptedSocket);
 		memcpy(myBuffer, "ErrorC", 7);
 	}
 	else
 	{
-		// there was an error during recv
-		//printf("recv failed with error: %d\n", WSAGetLastError());
-		//closesocket(acceptedSocket);
 		memcpy(myBuffer, "ErrorR", 7);
 	}
 	return myBuffer;
@@ -147,17 +133,16 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 	}
 	else {
 
-		int cnt = iResult;
-		while (cnt < messageSize) {
+		int sentBytes = iResult;
+		while (sentBytes < messageSize) {
 
 			SelectFunction(connectSocket, 'w');
-			iResult = send(connectSocket, message + cnt, messageSize - cnt, 0);
-			cnt += iResult;
+			iResult = send(connectSocket, message + sentBytes, messageSize - sentBytes, 0);
+			sentBytes += iResult;
 		}
 	}
 
 	return 1;
-	//printf("Bytes Sent: %ld\n", iResult);
 }
 
 ///<summary>
@@ -174,21 +159,16 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		timeval timeVal;
 
 		FD_ZERO(&set);
-		// Add socket we will wait to read from
+		
 		FD_SET(listenSocket, &set);
 
-		// Set timeouts to zero since we want select to return
-		// instantaneously
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
 
-		if (!recvPossible) {
+		if (!appRunning) {
 			return -1;
 		}
 
-		if (!sendPossible) {
-			return -1;
-		}
 
 		if (rw == 'r') {
 			iResult = select(0 /* ignored */, &set, NULL, NULL, &timeVal);
@@ -198,22 +178,22 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		}
 
 
-		// lets check if there was an error during select
+	
 		if (iResult == SOCKET_ERROR)
 		{
 			fprintf(stderr, "select failed with error: %ld\n", WSAGetLastError());
 			continue;
 		}
 
-		// now, lets check if there are any sockets ready
+	
 		if (iResult == 0)
 		{
-			// there are no ready sockets, sleep for a while and check again
+	
 			Sleep(SERVER_SLEEP_TIME);
 			continue;
 		}
 		break;
-		//NEW
+	
 	}
 
 	return 1;

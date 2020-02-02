@@ -20,25 +20,31 @@
 bool serverStopped = false;
 bool appRunning = true;
 
-void EnterAndGenerateMessage(char* publish_message, char* message);
-bool ValidateMessage(char* publish_message);
+void EnterAndGenerateMessage(char* , char* );
+bool ValidateMessage(char* );
 int SelectFunction(SOCKET, char);
 void PrintMenu();
-void ProcessInput(char input, char* message);
+void ProcessInput(char, char* );
 int SendFunction(SOCKET,char*,int);
 char* ReceiveFunction(SOCKET, char*);
 int Connect(SOCKET);
 
-bool ValidateMessage(char* publish_message) {
-	if (!strcmp(publish_message, "\n")) {
+
+///<summary>
+/// Validates message to publish.
+///</summary>
+///<param name ="publish_message">Message to be published.</param>
+///<returns>Return false if message is empty, otherwise true.</returns>
+bool ValidateMessage(char* publishMessage) {
+	if (!strcmp(publishMessage, "\n")) {
 		return false;
 	}
 	
-	int messageLength = strlen(publish_message);
+	int messageLength = strlen(publishMessage);
 
 	for (int i = 0; i < messageLength - 1; i++)
 	{
-		if (publish_message[i] != ' ' && publish_message[i] != '\t') {
+		if (publishMessage[i] != ' ' && publishMessage[i] != '\t') {
 			return true;
 		}
 	}
@@ -51,18 +57,17 @@ bool ValidateMessage(char* publish_message) {
 ///<param name ="connectSocket">Connected socket.</param>
 ///<returns>Return value of Send function(indicating error).</returns>
 int Connect(SOCKET connectSocket) {
-	//char connect[] = "p:Connect";
-	char* connect = (char*)malloc(10 * sizeof(char));
-	strcpy(connect, "p:Connect");
+	char* connectMessage = (char*)malloc(10 * sizeof(char));
+	strcpy(connectMessage, "p:Connect");
 
-	int messageDataSize = strlen(connect) + 1;
+	int messageDataSize = strlen(connectMessage) + 1;
 	int messageSize = messageDataSize + sizeof(int);
 
-	MessageStruct* messageStruct = GenerateMessageStruct(connect, messageDataSize);
+	MessageStruct* messageStruct = GenerateMessageStruct(connectMessage, messageDataSize);
 
 	int retVal = SendFunction(connectSocket, (char*)messageStruct, messageSize);
 	free(messageStruct);
-	free(connect);
+	free(connectMessage);
 
 	return retVal;
 
@@ -92,16 +97,15 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 	}
 	else {
 
-		int cnt = iResult;
-		while (cnt < messageSize) {
+		int sentBytes = iResult;
+		while (sentBytes < messageSize) {
 
 			SelectFunction(connectSocket,'w');
-			iResult = send(connectSocket, message + cnt, messageSize - cnt, 0);
-			cnt += iResult;
+			iResult = send(connectSocket, message + sentBytes, messageSize - sentBytes, 0);
+			sentBytes += iResult;
 		}
 	}
 
-	//printf("Bytes Sent: %ld\n", iResult);
 	return 1;
 }
 
@@ -111,33 +115,32 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 ///<param name ="publish_message">Publisher's input message.</param>
 ///<param name ="message">Generated message for sending.</param>
 ///<returns>No return value.</returns>
-void EnterAndGenerateMessage(char* publish_message, char* message)
+void EnterAndGenerateMessage(char* publishMessage, char* message)
 {
 
 	printf("Enter message you want to publish(max length: 250): \n");
 	
-	//scanf("%249s", publish_message);
-	fgets(publish_message, MAX_MESSAGE_SIZE, stdin);
+	fgets(publishMessage, MAX_MESSAGE_SIZE, stdin);
 
-	while (!ValidateMessage(publish_message)) {
+	while (!ValidateMessage(publishMessage)) {
 
 		printf("Message cannot be empty. Please enter your message again: \n");
-		fgets(publish_message, MAX_MESSAGE_SIZE, stdin);
+		fgets(publishMessage, MAX_MESSAGE_SIZE, stdin);
 	}
 
 
-	if (strchr(publish_message, '\n') == NULL) {
+	if (strchr(publishMessage, '\n') == NULL) {
 		int c;
 		while ((c = fgetc(stdin)) != '\n' && c != EOF);
 	}
 	
-	if ((strlen(publish_message) > 0) && (publish_message[strlen(publish_message) - 1] == '\n'))
-		publish_message[strlen(publish_message) - 1] = '\0';
+	if ((strlen(publishMessage) > 0) && (publishMessage[strlen(publishMessage) - 1] == '\n'))
+		publishMessage[strlen(publishMessage) - 1] = '\0';
 	
 	strcat(message, ":");
-	strcat(message, publish_message);
+	strcat(message, publishMessage);
 
-	printf("You published message: %s.\n", publish_message);
+	printf("You published message: %s.\n", publishMessage);
 }
 
 
@@ -156,7 +159,7 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 		memcpy(retVal, "ErrorS", 7);	
 		return retVal;
 	}
-	iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
+	iResult = recv(acceptedSocket, recvbuf, 4, 0); 
 
     if (iResult == 0)
 	{
@@ -185,11 +188,9 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		timeval timeVal;
 
 		FD_ZERO(&set);
-		// Add socket we will wait to read from
+
 		FD_SET(listenSocket, &set);
 
-		// Set timeouts to zero since we want select to return
-		// instantaneously
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
 
@@ -206,22 +207,19 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		}
 
 
-		// lets check if there was an error during select
 		if (iResult == SOCKET_ERROR)
 		{
 			fprintf(stderr, "select failed with error: %ld\n", WSAGetLastError());
 			continue;
 		}
 
-		// now, lets check if there are any sockets ready
 		if (iResult == 0)
 		{
-			// there are no ready sockets, sleep for a while and check again
 			Sleep(SERVER_SLEEP_TIME);
 			continue;
 		}
 		break;
-		//NEW
+		
 	} while (1);
 
 }

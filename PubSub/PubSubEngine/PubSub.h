@@ -12,8 +12,9 @@
 #define DEFAULT_PORT "27016"
 #define SERVER_SLEEP_TIME 50
 #define NUMBER_OF_CLIENTS 40
+#define INV_SOCKET 3435973836
 
-bool serverRunning = true;
+bool appRunning = true;
 int clientsCount = 0;
 int numberOfPublishers = 0;
 
@@ -26,8 +27,8 @@ int SelectFunction(SOCKET, char);
 void Subscribe(struct Queue*, SOCKET, char*);
 void Publish(struct MessageQueue*, char*, char*,int);
 void SubscriberShutDown(Queue*, SOCKET, struct Subscriber subscribers[]);
-char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf);
-int SendFunction(SOCKET connectSocket, char* message, int messageSize);
+char* ReceiveFunction(SOCKET, char* );
+int SendFunction(SOCKET, char*, int);
 char Connect(SOCKET);
 void AddTopics(Queue*);
 
@@ -55,12 +56,13 @@ void AddTopics(Queue* queue) {
 char Connect(SOCKET acceptedSocket) {
 	char recvbuf[DEFAULT_BUFLEN];
 	char *recvRes;
-	//memcpy(recvbuf, ReceiveFunction(acceptedSocket, recvbuf), DEFAULT_BUFLEN);
+	
 	recvRes = ReceiveFunction(acceptedSocket, recvbuf);
+
 	if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR"))
 	{
 		char delimiter[] = ":";
-		//char delimiter = ':';
+	
 		char *ptr = strtok(recvRes, delimiter);
 
 		char *role = ptr;
@@ -71,7 +73,7 @@ char Connect(SOCKET acceptedSocket) {
 			subscriberThreadArgument.ordinalNumber = numberOfConnectedSubs;
 			subscriberThreadArgument.socket = acceptedSocket;
 			subscriberThreadArgument.clientNumber = clientsCount;
-			//SubscriberThreads[numberOfSubscribers] = CreateThread(NULL, 0, &SubscriberReceive, &argumentStructure, 0, &SubscriberThreadsID[numberOfSubscribers]);
+			
 			printf("\nSubscriber %d connected.\n", numberOfConnectedSubs);
 			
 			free(recvRes);
@@ -82,7 +84,7 @@ char Connect(SOCKET acceptedSocket) {
 			publisherThreadArgument.ordinalNumber = numberOfPublishers;
 			publisherThreadArgument.socket = acceptedSocket;
 			publisherThreadArgument.clientNumber = clientsCount;
-			//PublisherThreads[numberOfPublishers] = CreateThread(NULL, 0, &PublisherWork, &acceptedSocket, 0, &PublisherThreadsID[numberOfPublishers]);
+			
 			printf("\nPublisher %d connected.\n", numberOfPublishers);
 			
 			free(recvRes);
@@ -92,13 +94,11 @@ char Connect(SOCKET acceptedSocket) {
 	}
 	else if (!strcmp(recvRes, "ErrorC"))
 	{
-		// connection was closed gracefully
 		printf("\nConnection with client closed.\n");
 		closesocket(acceptedSocket);
 	}
 	else if (!strcmp(recvRes, "ErrorR"))
 	{
-		// there was an error during recv
 		printf("\nrecv failed with error: %d\n", WSAGetLastError());
 		closesocket(acceptedSocket);
 	}
@@ -131,17 +131,17 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 	}
 	else {
 
-		int cnt = iResult;
-		while (cnt < messageSize) {
+		int sentBytes = iResult;
+		while (sentBytes < messageSize) {
 
 			SelectFunction(connectSocket, 'w');
-			iResult = send(connectSocket, message + cnt, messageSize - cnt, 0);
-			cnt += iResult;
+			iResult = send(connectSocket, message + sentBytes, messageSize - sentBytes, 0);
+			sentBytes += iResult;
 		}
 	}
 
 	return 1;
-	//printf("Bytes Sent: %ld\n", iResult);
+	
 }
 
 ///<summary>
@@ -160,40 +160,28 @@ char* ReceiveFunction(SOCKET acceptedSocket, char* recvbuf) {
 			memcpy(myBuffer, "ErrorS", 7);
 			return myBuffer;
 		}
-		iResult = recv(acceptedSocket, recvbuf, 4, 0); // primamo samo header poruke
+		iResult = recv(acceptedSocket, recvbuf, 4, 0); 
 
 		if (iResult > 0)
 		{
 			int bytesExpected = *((int*)recvbuf);
-			//printf("Size of message is : %d\n", bytesExpected);
 
-			//char* myBuffer = (char*)(malloc(bytesExpected)); // alociranje memorije za poruku
+			int recvBytes = 0;
 
-			int cnt = 0;
-
-			while (cnt < bytesExpected) {
+			while (recvBytes < bytesExpected) {
 
 				SelectFunction(acceptedSocket, 'r');
-				iResult = recv(acceptedSocket, myBuffer + cnt, bytesExpected - cnt, 0);
+				iResult = recv(acceptedSocket, myBuffer + recvBytes, bytesExpected - recvBytes, 0);
 
-				//printf("Message received from client: %s.\n", myBuffer);
-
-				cnt += iResult;
+				recvBytes += iResult;
 			}
-			//return myBuffer;
 		}
 		else if (iResult == 0)
 		{
-			// connection was closed gracefully
-			//printf("Connection with client closed.\n");
-			//closesocket(acceptedSocket);
 			memcpy(myBuffer, "ErrorC", 7);
 		}
 		else
 		{
-			// there was an error during recv
-			//printf("recv failed with error: %d\n", WSAGetLastError());
-			//closesocket(acceptedSocket);
 			memcpy(myBuffer, "ErrorR", 7);
 		}	
 		return(myBuffer);
@@ -216,13 +204,13 @@ void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct Subscriber s
 			if (queue->array[i].subs_array[j] == acceptedSocket) {
 				int size = queue->array[i].size;
 				SOCKET temp = queue->array[i].subs_array[size];
-				if (temp != 3435973836) {
-					queue->array[i].subs_array[size] = 3435973836;
+				if (temp != INV_SOCKET) {
+					queue->array[i].subs_array[size] = INV_SOCKET;
 					queue->array[i].subs_array[j] = temp;
 					queue->array[i].size--;
 				}
 				else {
-					queue->array[i].subs_array[j] = 3435973836;
+					queue->array[i].subs_array[j] = INV_SOCKET;
 					queue->array[i].size--;
 				}
 				
@@ -233,8 +221,8 @@ void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct Subscriber s
 
 	for (int i = 0; i < sizeof(subscribers)/sizeof(struct Subscriber); i++)
 	{
-		if (subscribers[i].sendTo == acceptedSocket) {
-			subscribers[i].sendTo = 0;
+		if (subscribers[i].socket == acceptedSocket) {
+			subscribers[i].socket = 0;
 			subscribers[i].hSemaphore = 0;
 		}
 	}
@@ -264,13 +252,13 @@ void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 ///<param name ="message">Published message.</param>
 ///<param name ="topic">Topic publisher has published to.</param>
 ///<returns>No return value.</returns>
-void Publish(struct MessageQueue* message_queue, char* topic, char* message,int ordinalNumber) {
+void Publish(struct MessageQueue* messageQueue, char* topic, char* message,int ordinalNumber) {
 	
 	struct topic_message item;
 	memcpy(item.message, message, strlen(message)+1);
 	memcpy(item.topic, topic, strlen(topic)+1);
 
-	EnqueueMessageQueue(message_queue, item);
+	EnqueueMessageQueue(messageQueue, item);
 
 	printf("\nPublisher %d published message: %s to topic: %s\n",ordinalNumber, item.message, item.topic);
 
@@ -297,7 +285,7 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
 
-		if (!serverRunning)
+		if (!appRunning)
 			return -1;
 
 		if (rw == 'r') {
@@ -324,6 +312,3 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 	} while (1);
 
 }
-
-
-

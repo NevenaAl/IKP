@@ -13,17 +13,17 @@ DWORD WINAPI PublisherSend(LPVOID lpParam) {
 	while (appRunning && !serverStopped) {
 
 		PrintMenu();
-		char c = _getch();
+		char input = _getch();
 
 		char* message = (char*)malloc(270 * sizeof(char));
 
-		if (c == '1' || c == '2' || c == '3' || c == '4' || c == '5') {
+		if (input == '1' || input == '2' || input == '3' || input == '4' || input == '5') {
 
-			ProcessInput(c, message);
+			ProcessInput(input, message);
 
-			char* publish_message = (char*)malloc(250*sizeof(char));
+			char* publishMessage = (char*)malloc(250*sizeof(char));
 
-			EnterAndGenerateMessage(publish_message, message);
+			EnterAndGenerateMessage(publishMessage, message);
 
 			int messageDataSize = strlen(message) + 1;
 			int messageSize = messageDataSize + sizeof(int);
@@ -32,13 +32,13 @@ DWORD WINAPI PublisherSend(LPVOID lpParam) {
 			int sendResult = SendFunction(connectSocket, (char*)messageStructToSend, messageSize);
 			free(messageStructToSend);
 			free(message);
-			free(publish_message);
+			free(publishMessage);
 			if (sendResult == -1)
 				break;
 
 			
 		}
-		else if (c == 'x' || c == 'X') {
+		else if (input == 'x' || input == 'X') {
 			strcpy(message, "p:shutDown");
 			int messageDataSize = strlen(message) + 1;
 			int messageSize = messageDataSize + sizeof(int);
@@ -83,7 +83,7 @@ DWORD WINAPI PublisherReceive(LPVOID lpParam) {
 		char* recvRes;
 
 		recvRes = ReceiveFunction(connectSocket, recvbuf);
-		//memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
+
 	    if (!strcmp(recvRes, "ErrorS")) {
 			 free(recvRes);
 			 break;
@@ -100,7 +100,6 @@ DWORD WINAPI PublisherReceive(LPVOID lpParam) {
 		}
 		else if (!strcmp(recvRes, "ErrorR"))
 		{
-			// there was an error during recv
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(connectSocket);
 			appRunning = false;
@@ -167,7 +166,6 @@ int __cdecl main(int argc, char **argv)
 	publisherSendThread = CreateThread(NULL, 0, &PublisherSend, &connectSocket, 0, &publisherSendID);
 	publisherReceiveThread = CreateThread(NULL, 0, &PublisherReceive, &connectSocket, 0, &publisherReceiveID);
 
-	//PUBLISHER WHILE
 	while (appRunning && !serverStopped) {
 
 	}

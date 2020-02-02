@@ -7,29 +7,29 @@
 ///<param name ="lpParam"> Socket used to communicate with Server. </param>
 ///<returns>No return value.</returns>
 DWORD WINAPI SubscriberSend(LPVOID lpParam) {
-	int subscribed[5];
+	int subscribedTopics[5];
 	int numOfSubscribedTopics = 0;
 	int iResult = 0;
 	SOCKET connectSocket = *(SOCKET*)lpParam;
-	while (sendPossible) {
+	while (appRunning) {
 
 		PrintMenu();
 
-		char c = _getch();
+		char input = _getch();
 
 		char* message = (char*)malloc(20 * sizeof(char));
 
-		if (c == '1' || c == '2' || c == '3' || c == '4' || c == '5') {
+		if (input == '1' || input == '2' || input == '3' || input == '4' || input == '5') {
 
-			if (AlreadySubscribed(c, subscribed, numOfSubscribedTopics)) {
+			if (AlreadySubscribed(input, subscribedTopics, numOfSubscribedTopics)) {
 				printf("You are already subscribed to this topic.\n");
 				continue;
 			}
 
-			subscribed[numOfSubscribedTopics] = c - '0';
+			subscribedTopics[numOfSubscribedTopics] = input - '0';
 			numOfSubscribedTopics++;
 
-			ProcessInputAndGenerateMessage(c, message);
+			ProcessInputAndGenerateMessage(input, message);
 
 			int messageDataSize = strlen(message) + 1;
 			int messageSize = messageDataSize + sizeof(int);
@@ -43,7 +43,7 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 			}
 
 		}
-		else if (c == 'x' || c == 'X') {
+		else if (input == 'x' || input == 'X') {
 			strcpy(message, "s:shutDown");
 			int messageDataSize = strlen(message) + 1;
 			int messageSize = messageDataSize + sizeof(int);
@@ -56,8 +56,7 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 				break;
 			}
 
-			sendPossible = false;
-			recvPossible = false;
+			appRunning = false;
 			closesocket(connectSocket);
 			break;
 		}
@@ -80,16 +79,15 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	int iResult = 0;
 	SOCKET connectSocket = *(SOCKET*)lpParam;
 	char recvbuf[DEFAULT_BUFLEN];
-	char* recvRes; // = (char*)malloc(DEFAULT_BUFLEN);
+	char* recvRes; 
 
-	while (recvPossible) 
+	while (appRunning)
 	{
 		recvRes = ReceiveFunction(connectSocket, recvbuf);
-		//memcpy(recvbuf, ReceiveFunction(connectSocket, recvbuf), DEFAULT_BUFLEN);
 		if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
 		{
 			char delimiter[] = ":";
-			//char delimiter = ':';
+
 			char *ptr = strtok(recvRes, delimiter);
 
 			char *topic = ptr;
@@ -102,31 +100,21 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		}
 		else if(!strcmp(recvRes, "ErrorS")) {
 
-			//free(recvRes);
-			//return 1;
 			break;
 		}
 		else if (!strcmp(recvRes, "ErrorC"))
 		{
-		// connection was closed gracefully
 			printf("\nConnection with server closed.\n");
 			printf("Press any key to close this window . . .");
 			closesocket(connectSocket);
-			sendPossible = false;
-			recvPossible = false;
-			/*free(recvRes);
-			return 1;*/
+			appRunning = false;
 			break;
 		}
 		else if (!strcmp(recvRes, "ErrorR"))
 		{
-			// there was an error during recv
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(connectSocket);
-			sendPossible = false;
-			recvPossible = false;
-			/*free(recvRes);
-			return 1;*/
+			appRunning = false;
 			break;
 		}
 
@@ -137,10 +125,8 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 }
 int __cdecl main(int argc, char **argv)
 {
-	// socket used to communicate with server
 	SOCKET connectSocket = INVALID_SOCKET;
 	
-	// variable used to store function return value
 	int iResult;
 
 	if (InitializeWindowsSockets() == false)
@@ -148,7 +134,6 @@ int __cdecl main(int argc, char **argv)
 		return 1;
 	}
 
-	// create a socket
 	connectSocket = socket(AF_INET,
 		SOCK_STREAM,
 		IPPROTO_TCP);
@@ -160,12 +145,11 @@ int __cdecl main(int argc, char **argv)
 		return 1;
 	}
 
-	// create and initialize address structure
 	sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 	serverAddress.sin_port = htons(DEFAULT_PORT);
-	// connect to server specified in serverAddress and socket connectSocket
+
 	if (connect(connectSocket, (SOCKADDR*)&serverAddress, sizeof(serverAddress)) == SOCKET_ERROR)
 	{
 		printf("Unable to connect to server.\n");
@@ -186,8 +170,7 @@ int __cdecl main(int argc, char **argv)
 
 	int connectResult = Connect(connectSocket);
 	if (connectResult == -1) {
-		sendPossible = false;
-		recvPossible = false;
+		appRunning = false;
 	}
 	
 
@@ -195,7 +178,7 @@ int __cdecl main(int argc, char **argv)
 	SubscriberRecvThread = CreateThread(NULL, 0, &SubscriberReceive, &connectSocket, 0, &SubscriberRecvThreadId);
 
 
-	while (recvPossible && sendPossible) {
+	while (appRunning) {
 
 	}
 
@@ -206,7 +189,7 @@ int __cdecl main(int argc, char **argv)
 
 	SAFE_DELETE_HANDLE(SubscriberSendThread);
 	SAFE_DELETE_HANDLE(SubscriberRecvThread);
-	// cleanup
+
 	closesocket(connectSocket);
 
 

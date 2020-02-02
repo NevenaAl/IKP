@@ -1,5 +1,5 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\Common7\IDE\VC\VCTargets\Microsoft.CppBuild.targets(391,5): warning MSB8028: The intermediate directory (Debug\) contains files shared from another project (WinSockClient.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\Common7\IDE\VC\VCTargets\Microsoft.CppBuild.targets(391,5): warning MSB8028: The intermediate directory (Debug\) contains files shared from another project (WinSockClient.vcxproj).  This can lead to incorrect clean and rebuild behavior.
   Client.cpp
-c:\users\tanja\onedrive\documents\github\ikp\pubsub\common\queue.h(147): warning C4715: 'Dequeue': not all control paths return a value
-c:\users\tanja\onedrive\documents\github\ikp\pubsub\common\queue.h(162): warning C4715: 'DequeueMessageQueue': not all control paths return a value
-  Subscriber.vcxproj -> C:\Users\tanja\OneDrive\Documents\GitHub\IKP\PubSub\Debug\Subscriber.exe
+d:\desktop\ikp\pubsub\common\queue.h(147): warning C4715: 'Dequeue': not all control paths return a value
+d:\desktop\ikp\pubsub\common\queue.h(162): warning C4715: 'DequeueMessageQueue': not all control paths return a value
+  Subscriber.vcxproj -> D:\Desktop\IKP\PubSub\Debug\Subscriber.exe

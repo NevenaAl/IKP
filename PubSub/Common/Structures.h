@@ -31,7 +31,7 @@ struct MessageQueue
 };
 
 struct Subscriber {
-	SOCKET sendTo;
+	SOCKET socket;
 	HANDLE hSemaphore;
 };
 
