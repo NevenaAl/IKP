@@ -350,6 +350,7 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 				if (!strcmp(topic, "shutDown")) {
 					printf("\nPublisher %d disconnected.\n", argumentStructure.ordinalNumber);
 					acceptedSockets[argumentStructure.clientNumber] = -1;
+					free(recvRes);
 					break;
 				}
 				else {
@@ -358,29 +359,33 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 					Publish(messageQueue, topic, message, argumentStructure.ordinalNumber);
 					LeaveCriticalSection(&message_queueAccess);
 					ReleaseSemaphore(pubSubSemaphore, 1, NULL);
+					free(recvRes);
 
 				}
 			}
-			free(recvRes);
+			//free(recvRes);
 		}
 		else if (!strcmp(recvRes, "ErrorS")) {
+			free(recvRes);
 			break;
 		}
 		else if (!strcmp(recvRes, "ErrorC"))
 		{
 			printf("\nConnection with client closed.\n");
 			closesocket(argumentStructure.socket);
+			free(recvRes);
 			break;
 		}
 		else if (!strcmp(recvRes, "ErrorR"))
 		{
 			printf("\nrecv failed with error: %d\n", WSAGetLastError());
 			closesocket(argumentStructure.socket);
+			free(recvRes);
 			break;
 
 		}
 	}
-	free(recvRes);
+	//free(recvRes);
 	publisherThreadKilled = argumentStructure.ordinalNumber;
 	return 1;
 }

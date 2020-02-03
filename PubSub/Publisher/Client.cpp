@@ -12,7 +12,7 @@ DWORD WINAPI PublisherSend(LPVOID lpParam) {
 
 	while (appRunning && !serverStopped) {
 
-		PrintMenu();
+		/*PrintMenu();
 		char input = _getch();
 
 		char* message = (char*)malloc(270 * sizeof(char));
@@ -61,7 +61,45 @@ DWORD WINAPI PublisherSend(LPVOID lpParam) {
 			continue;
 		}
 
-		
+		*/
+
+		char* message = (char*)malloc(270 * sizeof(char));
+
+		for (int i = 1; i < 6; i++)
+		{
+			if (i == 1) {
+				strcpy(message, "p:Sport");
+			}
+			else if (i == 2) {
+				strcpy(message, "p:Fashion");
+			}
+			else if (i == 3) {
+				strcpy(message, "p:Politics");
+			}
+			else if (i == 4) {
+				strcpy(message, "p:News");
+			}
+			else if (i == 5) {
+				strcpy(message, "p:Show business");
+			}
+
+			strcat(message, ":Poruka\0");
+
+			int messageDataSize = strlen(message) + 1;
+			int messageSize = messageDataSize + sizeof(int);
+
+			MessageStruct* messageStructToSend = GenerateMessageStruct(message, messageDataSize);
+			int sendResult = SendFunction(connectSocket, (char*)messageStructToSend, messageSize);
+			free(messageStructToSend);
+
+			if (sendResult == -1) {
+				break;
+			}
+		}
+
+		free(message);
+
+		Sleep(500);
 
 	}
 	return 1;
