@@ -194,9 +194,7 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
 
-		if (serverStopped)
-			return -1;
-		if (!appRunning) {
+		if (!appRunning || serverStopped) {
 			return -1;
 		}
 		if (rw == 'r') {

@@ -18,6 +18,7 @@
 
 
 bool appRunning = true;
+bool serverStopped = false;
 
 int SelectFunction(SOCKET, char);
 void PrintMenu();
@@ -154,7 +155,7 @@ int SendFunction(SOCKET connectSocket, char* message, int messageSize) {
 ///<returns>Returns -1 if server closed connection.</returns>
 int SelectFunction(SOCKET listenSocket, char rw) {
 	int iResult = 0;
-	while(true) {
+	do {
 		FD_SET set;
 		timeval timeVal;
 
@@ -165,7 +166,7 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		timeVal.tv_sec = 0;
 		timeVal.tv_usec = 0;
 
-		if (!appRunning) {
+		if (!appRunning || serverStopped) {
 			return -1;
 		}
 
@@ -194,8 +195,7 @@ int SelectFunction(SOCKET listenSocket, char rw) {
 		}
 		break;
 	
-	}
-
+	} while (1);
 	return 1;
 
 }

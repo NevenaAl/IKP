@@ -2,6 +2,7 @@
 
 CRITICAL_SECTION queueAccess;
 CRITICAL_SECTION message_queueAccess;
+bool serverStopped = false;
 
 HANDLE pubSubSemaphore;
 int publisherThreadKilled = -1;
@@ -80,12 +81,13 @@ DWORD WINAPI GetChar(LPVOID lpParam)
 		printf("\nIf you want to quit please press X!\n");
 		 input = _getch();
 		 if (input == 'x' || input == 'X') {
-			 appRunning = false;
+			 serverStopped = true;
 			 ReleaseSemaphore(pubSubSemaphore, 1, NULL);
 			 for (int i = 0; i < sizeof(subscribers); i++)
 			 {
 				 ReleaseSemaphore(subscribers[i].hSemaphore, 1, NULL);
 			 }
+			 appRunning = false;
 			 int iResult = 0;
 			 for (int i = 0; i < clientsCount; i++) {
 				 if (acceptedSockets[i] != -1) {
@@ -94,7 +96,7 @@ DWORD WINAPI GetChar(LPVOID lpParam)
 					 {
 						 printf("\nshutdown failed with error: %d\n", WSAGetLastError());
 						 closesocket(acceptedSockets[i]);
-						 WSACleanup();
+						 //WSACleanup();
 						 return 1;
 					 }
 					 closesocket(acceptedSockets[i]);
@@ -128,7 +130,7 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 			}
 		}
 		
-		if (!appRunning)
+		if (serverStopped)
 			break;
 
 		char* message = (char*)malloc(sizeof(topic_message) + 1);
@@ -148,7 +150,10 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 		if (sendResult == -1)
 			break;
 	}
-	subscriberSendThreadKilled = argumentStructure.ordinalNumber;
+
+	if(!serverStopped)
+		subscriberSendThreadKilled = argumentStructure.ordinalNumber;
+
 	return 1;
 }
 
@@ -186,7 +191,10 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			subscriberRunning = false;
 			acceptedSockets[argumentSendStructure.clientNumber] = -1;
 			free(recvRes);
-			subscriberRecvThreadKilled = argumentSendStructure.ordinalNumber;
+
+			if(!serverStopped)
+				subscriberRecvThreadKilled = argumentSendStructure.ordinalNumber;
+
 			return 1;
 		}
 		else {
@@ -275,7 +283,10 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 
 		}
 	}
-	subscriberRecvThreadKilled = argumentSendStructure.ordinalNumber;
+
+	if(!serverStopped)
+		subscriberRecvThreadKilled = argumentSendStructure.ordinalNumber;
+
 	return 1;
 }
 
@@ -290,7 +301,7 @@ DWORD WINAPI PubSubWork(LPVOID lpParam) {
 	SOCKET sendSocket;
 	while (appRunning) {
 		WaitForSingleObject(pubSubSemaphore, INFINITE);
-		if (!appRunning)
+		if (serverStopped)
 			break;
 
 		EnterCriticalSection(&message_queueAccess);
@@ -386,7 +397,8 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 		}
 	}
 	//free(recvRes);
-	publisherThreadKilled = argumentStructure.ordinalNumber;
+	if(appRunning)
+		publisherThreadKilled = argumentStructure.ordinalNumber;
 	return 1;
 }
 
@@ -564,10 +576,12 @@ int  main(void)
 
 	for (int i = 0; i < numberOfConnectedSubs; i++) {
 		SAFE_DELETE_HANDLE(SubscriberRecvThreads[i]);
+		SubscriberRecvThreads[i] = INVALID_HANDLE_VALUE;
 	}
 
 	for (int i = 0; i < numberOfSubscribedSubs; i++) {
 		SAFE_DELETE_HANDLE(SubscriberSendThreads[i]);
+		SubscriberSendThreads[i] = INVALID_HANDLE_VALUE;
 	}
 
 	SAFE_DELETE_HANDLE(pubSubThread);

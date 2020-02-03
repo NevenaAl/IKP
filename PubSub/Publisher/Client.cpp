@@ -1,5 +1,7 @@
 #include "Publisher.h"
 
+HANDLE publisherSendThread, publisherReceiveThread;
+DWORD publisherSendID, publisherReceiveID;
 
 ///<summary>
 /// A function executing in thread created and run at the begining of main program. 
@@ -123,6 +125,9 @@ DWORD WINAPI PublisherReceive(LPVOID lpParam) {
 		recvRes = ReceiveFunction(connectSocket, recvbuf);
 
 	    if (!strcmp(recvRes, "ErrorS")) {
+			closesocket(connectSocket);
+			appRunning = false;
+			serverStopped = true;
 			 free(recvRes);
 			 break;
 		}
@@ -196,15 +201,15 @@ int __cdecl main(int argc, char **argv)
 	int connectResult = Connect(connectSocket);
 	if (connectResult == -1) {
 		serverStopped = true;
+		appRunning = false;
 	}
 		
-	HANDLE publisherSendThread, publisherReceiveThread;
-	DWORD publisherSendID, publisherReceiveID;
+	
 
 	publisherSendThread = CreateThread(NULL, 0, &PublisherSend, &connectSocket, 0, &publisherSendID);
 	publisherReceiveThread = CreateThread(NULL, 0, &PublisherReceive, &connectSocket, 0, &publisherReceiveID);
 
-	while (appRunning && !serverStopped) {
+	while (appRunning || !serverStopped) {
 
 	}
 

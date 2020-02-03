@@ -1,5 +1,9 @@
 #include "Subscriber.h"
 
+
+HANDLE SubscriberSendThread, SubscriberRecvThread;
+DWORD SubscriberSendThreadId, SubscriberRecvThreadId;
+
 ///<summary>
 /// A function executing in thread created and run at the begining of main program. 
 /// It is used for sending messages to Server.
@@ -11,11 +15,12 @@ DWORD WINAPI SubscriberSend(LPVOID lpParam) {
 	int numOfSubscribedTopics = 0;
 	int iResult = 0;
 	SOCKET connectSocket = *(SOCKET*)lpParam;
-	while (appRunning) {
+	while (appRunning && !serverStopped) {
 
 		PrintMenu();
 
 		char input = _getch();
+		//char input = '1';
 
 		char* message = (char*)malloc(20 * sizeof(char));
 
@@ -81,7 +86,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 	char recvbuf[DEFAULT_BUFLEN];
 	char* recvRes; 
 
-	while (appRunning)
+	while (appRunning && !serverStopped)
 	{
 		recvRes = ReceiveFunction(connectSocket, recvbuf);
 		if (strcmp(recvRes, "ErrorC") && strcmp(recvRes, "ErrorR") && strcmp(recvRes, "ErrorS"))
@@ -97,9 +102,13 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 
 			printf("\nNew message: %s on topic: %s\n", message, topic);
 
+			free(recvRes);
 		}
 		else if(!strcmp(recvRes, "ErrorS")) {
-
+			closesocket(connectSocket);
+			appRunning = false;
+			serverStopped = true;
+			free(recvRes);
 			break;
 		}
 		else if (!strcmp(recvRes, "ErrorC"))
@@ -108,6 +117,8 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			printf("Press any key to close this window . . .");
 			closesocket(connectSocket);
 			appRunning = false;
+			serverStopped = true;
+			free(recvRes);
 			break;
 		}
 		else if (!strcmp(recvRes, "ErrorR"))
@@ -115,12 +126,12 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(connectSocket);
 			appRunning = false;
+			serverStopped = true;
+			free(recvRes);
 			break;
 		}
 
-		free(recvRes);
 	}
-	free(recvRes);
 	return 1;
 }
 int __cdecl main(int argc, char **argv)
@@ -165,12 +176,11 @@ int __cdecl main(int argc, char **argv)
 		printf("ioctlsocket failed with error: %ld\n", WSAGetLastError());
 		return 1;
 	}
-	HANDLE SubscriberSendThread,SubscriberRecvThread;
-	DWORD SubscriberSendThreadId, SubscriberRecvThreadId;
 
 	int connectResult = Connect(connectSocket);
 	if (connectResult == -1) {
 		appRunning = false;
+		serverStopped = true;
 	}
 	
 
@@ -178,7 +188,7 @@ int __cdecl main(int argc, char **argv)
 	SubscriberRecvThread = CreateThread(NULL, 0, &SubscriberReceive, &connectSocket, 0, &SubscriberRecvThreadId);
 
 
-	while (appRunning) {
+	while (appRunning || !serverStopped) {
 
 	}
 
