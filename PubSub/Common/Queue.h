@@ -9,7 +9,7 @@
 ///<param name ="queue"> Queue to expand.</param>
 ///<returns> No return value.</returns>
 void ExpandQueue(struct Queue* queue) {
-	queue->array = (topic_sub*)realloc(queue->array, queue->size * (sizeof(topic_sub)) + sizeof(topic_sub));
+	queue->array = (TopicSubscribers*)realloc(queue->array, queue->size * (sizeof(TopicSubscribers)) + sizeof(TopicSubscribers));
 	queue->capacity += 1;
 }
 
@@ -19,7 +19,7 @@ void ExpandQueue(struct Queue* queue) {
 ///<param name ="queue"> Queue to expand.</param>
 ///<returns> No return value.</returns>
 void ExpandMessageQueue(struct MessageQueue* queue) {
-	queue->array = (topic_message*)realloc(queue->array, queue->size*(sizeof(topic_message)) + sizeof(topic_message));
+	queue->array = (TopicMessage*)realloc(queue->array, queue->size*(sizeof(TopicMessage)) + sizeof(TopicMessage));
 	queue->capacity += 1;
 }
 
@@ -34,7 +34,7 @@ struct Queue* CreateQueue(unsigned capacity)
 	queue->capacity = capacity;
 	queue->front = queue->size = 0;
 	queue->rear = capacity - 1;  // This is important, see the Enqueue 
-	queue->array = (topic_sub*)malloc(queue->capacity * sizeof(topic_sub));
+	queue->array = (TopicSubscribers*)malloc(queue->capacity * sizeof(TopicSubscribers));
 	return queue;
 }
 
@@ -49,7 +49,7 @@ struct MessageQueue* CreateMessageQueue(unsigned capacity)
 	queue->capacity = capacity;
 	queue->front = queue->size = 0;
 	queue->rear = capacity - 1;  // This is important, see the enqueue 
-	queue->array = (topic_message*)malloc(queue->capacity * sizeof(topic_message));
+	queue->array = (TopicMessage*)malloc(queue->capacity * sizeof(TopicMessage));
 	return queue;
 }
 
@@ -101,7 +101,7 @@ int IsEmptyMessageQueue(struct MessageQueue*  queue)
 ///<returns> No return value.</returns> 
 void Enqueue(struct Queue* queue, char* topic)
 {
-	topic_sub item;
+	TopicSubscribers item;
 	//item.topic = topic;
 	strcpy(item.topic, topic);
 	//item.subs_array;
@@ -121,7 +121,7 @@ void Enqueue(struct Queue* queue, char* topic)
 ///<param name ="queue"> Queue to add to.</param>
 ///<param name ="topic"> Topic message structure to add.</param>
 ///<returns> No return value.</returns> 
-void EnqueueMessageQueue(struct MessageQueue* queue, topic_message topic)
+void EnqueueMessageQueue(struct MessageQueue* queue, TopicMessage topic)
 {
 	if (IsFullMessageQueue(queue))
 		ExpandMessageQueue(queue);
@@ -136,10 +136,10 @@ void EnqueueMessageQueue(struct MessageQueue* queue, topic_message topic)
 ///</summary>
 ///<param name ="queue"> Queue to delete from.</param>
 ///<returns> Poped element.</returns> 
-topic_sub Dequeue(struct Queue* queue)
+TopicSubscribers Dequeue(struct Queue* queue)
 {
 	if (!IsEmpty(queue)) {
-		topic_sub item = queue->array[queue->front];
+		TopicSubscribers item = queue->array[queue->front];
 		queue->front = (queue->front + 1) % queue->capacity;
 		queue->size = queue->size - 1;
 		return item;
@@ -151,10 +151,10 @@ topic_sub Dequeue(struct Queue* queue)
 ///</summary>
 ///<param name ="queue"> Queue to delete from.</param>
 ///<returns> Poped element.</returns> 
-topic_message DequeueMessageQueue(struct MessageQueue* queue)
+TopicMessage DequeueMessageQueue(struct MessageQueue* queue)
 {
 	if (!IsEmptyMessageQueue(queue)) {
-		topic_message item = queue->array[queue->front];
+		TopicMessage item = queue->array[queue->front];
 		queue->front = (queue->front + 1) % queue->capacity;
 		queue->size = queue->size - 1;
 		return item;

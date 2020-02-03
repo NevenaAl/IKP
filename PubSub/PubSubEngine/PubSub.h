@@ -201,16 +201,16 @@ void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct Subscriber s
 	{
 		for (int j = 0; j < queue->array[i].size; j++)
 		{
-			if (queue->array[i].subs_array[j] == acceptedSocket) {
+			if (queue->array[i].subsArray[j] == acceptedSocket) {
 				int size = queue->array[i].size;
-				SOCKET temp = queue->array[i].subs_array[size];
+				SOCKET temp = queue->array[i].subsArray[size];
 				if (temp != INV_SOCKET) {
-					queue->array[i].subs_array[size] = INV_SOCKET;
-					queue->array[i].subs_array[j] = temp;
+					queue->array[i].subsArray[size] = INV_SOCKET;
+					queue->array[i].subsArray[j] = temp;
 					queue->array[i].size--;
 				}
 				else {
-					queue->array[i].subs_array[j] = INV_SOCKET;
+					queue->array[i].subsArray[j] = INV_SOCKET;
 					queue->array[i].size--;
 				}
 				
@@ -239,7 +239,7 @@ void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 	for (int i = 0; i < queue->size; i++) {
 		if (!strcmp(queue->array[i].topic, topic)) {
 			int index = queue->array[i].size;
-			queue->array[i].subs_array[index] = sub;
+			queue->array[i].subsArray[index] = sub;
 			queue->array[i].size++;
 		}
 	}
@@ -254,7 +254,7 @@ void Subscribe(struct Queue* queue, SOCKET sub, char* topic) {
 ///<returns>No return value.</returns>
 void Publish(struct MessageQueue* messageQueue, char* topic, char* message,int ordinalNumber) {
 	
-	struct topic_message item;
+	struct TopicMessage item;
 	memcpy(item.message, message, strlen(message)+1);
 	memcpy(item.topic, topic, strlen(topic)+1);
 

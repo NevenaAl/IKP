@@ -12,7 +12,7 @@ SOCKET acceptedSockets[NUMBER_OF_CLIENTS];
 
 struct Queue* queue;
 struct MessageQueue* messageQueue;
-struct topic_message poppedMessage;
+struct TopicMessage poppedMessage;
 struct Subscriber subscribers[20];
 
 
@@ -133,7 +133,7 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 		if (serverStopped)
 			break;
 
-		char* message = (char*)malloc(sizeof(topic_message) + 1);
+		char* message = (char*)malloc(sizeof(TopicMessage) + 1);
 		memcpy(message, &poppedMessage.topic, (strlen(poppedMessage.topic)));
 		memcpy(message + (strlen(poppedMessage.topic)), ":", 1);
 		memcpy(message + (strlen(poppedMessage.topic) + 1), &poppedMessage.message, (strlen(poppedMessage.message) + 1));
@@ -313,7 +313,7 @@ DWORD WINAPI PubSubWork(LPVOID lpParam) {
 			if (!strcmp(queue->array[i].topic, poppedMessage.topic)) {
 				for (int j = 0; j < queue->array[i].size; j++)
 				{
-					sendSocket = queue->array[i].subs_array[j];
+					sendSocket = queue->array[i].subsArray[j];
 					for (int i = 0; i < (sizeof(subscribers) / sizeof(Subscriber)); i++)
 					{
 						if (subscribers[i].socket == sendSocket) {
@@ -576,17 +576,21 @@ int  main(void)
 
 	for (int i = 0; i < numberOfConnectedSubs; i++) {
 		SAFE_DELETE_HANDLE(SubscriberRecvThreads[i]);
-		SubscriberRecvThreads[i] = INVALID_HANDLE_VALUE;
 	}
 
 	for (int i = 0; i < numberOfSubscribedSubs; i++) {
 		SAFE_DELETE_HANDLE(SubscriberSendThreads[i]);
-		SubscriberSendThreads[i] = INVALID_HANDLE_VALUE;
+	}
+
+	for (int i = 0; i < sizeof(subscribers)/sizeof(Subscriber); i++)
+	{
+		SAFE_DELETE_HANDLE(subscribers[i].hSemaphore);
 	}
 
 	SAFE_DELETE_HANDLE(pubSubThread);
 	SAFE_DELETE_HANDLE(exitThread);
 	SAFE_DELETE_HANDLE(closeHandlesThread);
+	SAFE_DELETE_HANDLE(pubSubSemaphore);
 
 	if (appRunning) {
 

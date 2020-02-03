@@ -8,26 +8,29 @@
 #define TOPIC_LEN 15
 #define MESSAGE_LEN 250
 
-struct topic_sub {
+struct TopicSubscribers {
 	char topic[TOPIC_LEN];
-	SOCKET subs_array[NUM_OF_SUBS];
+	SOCKET subsArray[NUM_OF_SUBS];
 	int size;
 };
-struct topic_message {
+
+struct TopicMessage {
 	char topic[TOPIC_LEN];
 	char message[MESSAGE_LEN];
 };
+
 struct Queue
 {
 	int front, rear, size;
 	unsigned capacity;
-	topic_sub* array;
+	TopicSubscribers* array;
 };
+
 struct MessageQueue
 {
 	int front, rear, size;
 	unsigned capacity;
-	topic_message* array;
+	TopicMessage* array;
 };
 
 struct Subscriber {
@@ -41,6 +44,7 @@ struct MessageStruct
 	char message[DEFAULT_BUFLEN - 4];
 
 };
+
 struct ThreadArgument {
 	SOCKET socket;
 	int ordinalNumber;
