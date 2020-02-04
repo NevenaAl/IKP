@@ -1,5 +1,5 @@
 ﻿  Client.cpp
-c:\users\tanja\onedrive\documents\github\ikp\pubsub\common\queue.h(147): warning C4715: 'Dequeue': not all control paths return a value
-c:\users\tanja\onedrive\documents\github\ikp\pubsub\common\queue.h(162): warning C4715: 'DequeueMessageQueue': not all control paths return a value
-c:\users\tanja\onedrive\documents\github\ikp\pubsub\publisher\publisher.h(223): warning C4715: 'SelectFunction': not all control paths return a value
-  Publisher.vcxproj -> C:\Users\tanja\OneDrive\Documents\GitHub\IKP\PubSub\Debug\Publisher.exe
+d:\desktop\ikp\pubsub\common\queue.h(147): warning C4715: 'Dequeue': not all control paths return a value
+d:\desktop\ikp\pubsub\common\queue.h(162): warning C4715: 'DequeueMessageQueue': not all control paths return a value
+d:\desktop\ikp\pubsub\publisher\publisher.h(223): warning C4715: 'SelectFunction': not all control paths return a value
+  Publisher.vcxproj -> D:\Desktop\IKP\PubSub\Debug\Publisher.exe

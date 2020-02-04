@@ -130,7 +130,7 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 			}
 		}
 		
-		if (serverStopped)
+		if (serverStopped || !subscribers[argumentStructure.ordinalNumber].running)
 			break;
 
 		char* message = (char*)malloc(sizeof(TopicMessage) + 1);
@@ -187,8 +187,9 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		ptr = strtok(NULL, delimiter);
 		if (!strcmp(topic, "shutDown")) {
 			printf("\nSubscriber %d disconnected.\n", argumentRecvStructure.ordinalNumber+1);
+			subscribers[argumentSendStructure.ordinalNumber].running = false;
+			ReleaseSemaphore(subscribers[argumentSendStructure.ordinalNumber].hSemaphore, 1, NULL);
 			SubscriberShutDown(queue, argumentSendStructure.socket, subscribers);
-			subscriberRunning = false;
 			acceptedSockets[argumentSendStructure.clientNumber] = -1;
 			free(recvRes);
 
@@ -203,6 +204,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			struct Subscriber subscriber;
 			subscriber.socket = argumentSendStructure.socket;
 			subscriber.hSemaphore = hSem;
+			subscriber.running = true;
 			subscribers[argumentSendStructure.ordinalNumber] = subscriber;
 
 			SubscriberSendThreads[numberOfSubscribedSubs] = CreateThread(NULL, 0, &SubscriberWork, &argumentSendStructure, 0, &SubscriberSendThreadsID[numberOfSubscribedSubs]);
@@ -249,6 +251,8 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			ptr = strtok(NULL, delimiter);
 			if (!strcmp(topic, "shutDown")) {
 				printf("\nSubscriber %d disconnected.\n", argumentRecvStructure.ordinalNumber+1);
+				subscribers[argumentSendStructure.ordinalNumber].running = false;
+				ReleaseSemaphore(subscribers[argumentSendStructure.ordinalNumber].hSemaphore, 1, NULL);
 				SubscriberShutDown(queue, argumentSendStructure.socket, subscribers);
 				subscriberRunning = false;
 				acceptedSockets[argumentSendStructure.clientNumber] = -1;

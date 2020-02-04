@@ -36,6 +36,7 @@ struct MessageQueue
 struct Subscriber {
 	SOCKET socket;
 	HANDLE hSemaphore;
+	bool running;
 };
 
 struct MessageStruct
