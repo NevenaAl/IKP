@@ -223,6 +223,7 @@ void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct Subscriber s
 	{
 		if (subscribers[i].socket == acceptedSocket) {
 			subscribers[i].socket = 0;
+			SAFE_DELETE_HANDLE(subscribers[i].hSemaphore);
 			subscribers[i].hSemaphore = 0;
 		}
 	}

@@ -96,7 +96,6 @@ DWORD WINAPI GetChar(LPVOID lpParam)
 					 {
 						 printf("\nshutdown failed with error: %d\n", WSAGetLastError());
 						 closesocket(acceptedSockets[i]);
-						 //WSACleanup();
 						 return 1;
 					 }
 					 closesocket(acceptedSockets[i]);
@@ -205,7 +204,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			subscriber.socket = argumentSendStructure.socket;
 			subscriber.hSemaphore = hSem;
 			subscriber.running = true;
-			subscribers[argumentSendStructure.ordinalNumber] = subscriber;
+			subscribers[numberOfSubscribedSubs] = subscriber;
 
 			SubscriberSendThreads[numberOfSubscribedSubs] = CreateThread(NULL, 0, &SubscriberWork, &argumentSendStructure, 0, &SubscriberSendThreadsID[numberOfSubscribedSubs]);
 			numberOfSubscribedSubs++;
@@ -378,7 +377,6 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 
 				}
 			}
-			//free(recvRes);
 		}
 		else if (!strcmp(recvRes, "ErrorS")) {
 			free(recvRes);
@@ -400,7 +398,6 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 
 		}
 	}
-	//free(recvRes);
 	if(appRunning)
 		publisherThreadKilled = argumentStructure.ordinalNumber;
 	return 1;
