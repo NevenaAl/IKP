@@ -74,7 +74,7 @@ char Connect(SOCKET acceptedSocket) {
 			subscriberThreadArgument.socket = acceptedSocket;
 			subscriberThreadArgument.clientNumber = clientsCount;
 			
-			printf("\nSubscriber %d connected.\n", numberOfConnectedSubs);
+			printf("\nSubscriber %d connected.\n", numberOfConnectedSubs+1);
 			
 			free(recvRes);
 			return 's';
@@ -85,7 +85,7 @@ char Connect(SOCKET acceptedSocket) {
 			publisherThreadArgument.socket = acceptedSocket;
 			publisherThreadArgument.clientNumber = clientsCount;
 			
-			printf("\nPublisher %d connected.\n", numberOfPublishers);
+			printf("\nPublisher %d connected.\n", numberOfPublishers+1);
 			
 			free(recvRes);
 			return 'p';
@@ -219,7 +219,7 @@ void SubscriberShutDown(Queue* queue, SOCKET acceptedSocket, struct Subscriber s
 
 	}
 
-	for (int i = 0; i < sizeof(subscribers)/sizeof(struct Subscriber); i++)
+	for (int i = 0; i < numberOfSubscribedSubs; i++)
 	{
 		if (subscribers[i].socket == acceptedSocket) {
 			subscribers[i].socket = 0;
@@ -260,7 +260,7 @@ void Publish(struct MessageQueue* messageQueue, char* topic, char* message,int o
 
 	EnqueueMessageQueue(messageQueue, item);
 
-	printf("\nPublisher %d published message: %s to topic: %s\n",ordinalNumber, item.message, item.topic);
+	printf("\nPublisher %d published message: %s to topic: %s\n",ordinalNumber+1, item.message, item.topic);
 
 }
 

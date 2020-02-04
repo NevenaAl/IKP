@@ -13,7 +13,7 @@ SOCKET acceptedSockets[NUMBER_OF_CLIENTS];
 struct Queue* queue;
 struct MessageQueue* messageQueue;
 struct TopicMessage poppedMessage;
-struct Subscriber subscribers[20];
+struct Subscriber subscribers[NUMBER_OF_CLIENTS];
 
 
 HANDLE SubscriberSendThreads[NUMBER_OF_CLIENTS];
@@ -83,7 +83,7 @@ DWORD WINAPI GetChar(LPVOID lpParam)
 		 if (input == 'x' || input == 'X') {
 			 serverStopped = true;
 			 ReleaseSemaphore(pubSubSemaphore, 1, NULL);
-			 for (int i = 0; i < sizeof(subscribers); i++)
+			 for (int i = 0; i < numberOfSubscribedSubs; i++)
 			 {
 				 ReleaseSemaphore(subscribers[i].hSemaphore, 1, NULL);
 			 }
@@ -122,7 +122,7 @@ DWORD WINAPI SubscriberWork(LPVOID lpParam)
 	ThreadArgument argumentStructure = *(ThreadArgument*)lpParam;
 
 	while (appRunning) {
-		for (int i = 0; i < (sizeof(subscribers) / sizeof(Subscriber)); i++)
+		for (int i = 0; i < numberOfSubscribedSubs; i++)
 		{
 			if (argumentStructure.socket == subscribers[i].socket) {
 				WaitForSingleObject(subscribers[i].hSemaphore, INFINITE);
@@ -186,7 +186,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 		char *topic = ptr;
 		ptr = strtok(NULL, delimiter);
 		if (!strcmp(topic, "shutDown")) {
-			printf("\nSubscriber %d disconnected.\n", argumentSendStructure.ordinalNumber);
+			printf("\nSubscriber %d disconnected.\n", argumentRecvStructure.ordinalNumber+1);
 			SubscriberShutDown(queue, argumentSendStructure.socket, subscribers);
 			subscriberRunning = false;
 			acceptedSockets[argumentSendStructure.clientNumber] = -1;
@@ -211,7 +211,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			EnterCriticalSection(&queueAccess);
 			Subscribe(queue, argumentSendStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			printf("\nSubscriber %d subscribed to topic: %s. \n", argumentSendStructure.ordinalNumber, topic);
+			printf("\nSubscriber %d subscribed to topic: %s. \n", argumentRecvStructure.ordinalNumber+1, topic);
 			free(recvRes);
 		}
 	}
@@ -248,7 +248,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			char *topic = ptr;
 			ptr = strtok(NULL, delimiter);
 			if (!strcmp(topic, "shutDown")) {
-				printf("\nSubscriber %d disconnected.\n", argumentSendStructure.ordinalNumber);
+				printf("\nSubscriber %d disconnected.\n", argumentRecvStructure.ordinalNumber+1);
 				SubscriberShutDown(queue, argumentSendStructure.socket, subscribers);
 				subscriberRunning = false;
 				acceptedSockets[argumentSendStructure.clientNumber] = -1;
@@ -259,7 +259,7 @@ DWORD WINAPI SubscriberReceive(LPVOID lpParam) {
 			EnterCriticalSection(&queueAccess);
 			Subscribe(queue, argumentSendStructure.socket, topic);
 			LeaveCriticalSection(&queueAccess);
-			printf("\nSubscriber %d subscribed to topic: %s.\n", argumentSendStructure.ordinalNumber, topic);
+			printf("\nSubscriber %d subscribed to topic: %s.\n", argumentRecvStructure.ordinalNumber+1, topic);
 			free(recvRes);
 
 		}
@@ -314,7 +314,7 @@ DWORD WINAPI PubSubWork(LPVOID lpParam) {
 				for (int j = 0; j < queue->array[i].size; j++)
 				{
 					sendSocket = queue->array[i].subsArray[j];
-					for (int i = 0; i < (sizeof(subscribers) / sizeof(Subscriber)); i++)
+					for (int i = 0; i < numberOfSubscribedSubs; i++)
 					{
 						if (subscribers[i].socket == sendSocket) {
 							ReleaseSemaphore(subscribers[i].hSemaphore, 1, NULL);
@@ -359,7 +359,7 @@ DWORD WINAPI PublisherWork(LPVOID lpParam)
 
 			if (!strcmp(role, "p")) {
 				if (!strcmp(topic, "shutDown")) {
-					printf("\nPublisher %d disconnected.\n", argumentStructure.ordinalNumber);
+					printf("\nPublisher %d disconnected.\n", argumentStructure.ordinalNumber+1);
 					acceptedSockets[argumentStructure.clientNumber] = -1;
 					free(recvRes);
 					break;
@@ -582,7 +582,7 @@ int  main(void)
 		SAFE_DELETE_HANDLE(SubscriberSendThreads[i]);
 	}
 
-	for (int i = 0; i < sizeof(subscribers)/sizeof(Subscriber); i++)
+	for (int i = 0; i < numberOfSubscribedSubs; i++)
 	{
 		SAFE_DELETE_HANDLE(subscribers[i].hSemaphore);
 	}
